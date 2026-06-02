@@ -1,0 +1,493 @@
+/* --- Estilos do Gerador de Etiquetas de QR Code --- */
+
+.etiquetas-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.etiquetas-grid-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .etiquetas-grid-layout {
+    grid-template-columns: 420px 1fr;
+  }
+}
+
+/* Colunas e Seções */
+.etiquetas-panel-config {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.etiquetas-panel-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.config-section-title h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Ícones temáticos */
+.icon-purple { color: #8b5cf6; }
+.icon-blue { color: #3b82f6; }
+.icon-green { color: #10b981; }
+.icon-orange { color: #f59e0b; }
+
+/* Customização checkboxes */
+.checkboxes-layout-group {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.checkbox-custom-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.checkbox-custom-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+.border-top-divider {
+  border-top: 1px solid var(--border-color);
+}
+
+/* Seletor rápido de produtos */
+.catalog-fast-selector-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.catalog-fast-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.catalog-fast-item:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--text-muted);
+}
+
+.catalog-fast-item.selected {
+  background-color: var(--primary-glow);
+  border-color: var(--primary-color);
+}
+
+.checkbox-circle {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-color);
+}
+
+.catalog-fast-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fast-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fast-code {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.empty-catalog-alert {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Fila de Emissão */
+.preview-controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.preview-controls-header .config-section-title {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.preview-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.danger-hover:hover {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.print-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.queue-item-card {
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  padding: 12px;
+}
+
+.queue-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.queue-item-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.queue-remove-btn {
+  color: var(--text-muted);
+  padding: 2px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-remove-btn:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--color-danger);
+}
+
+.queue-sizes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.queue-size-input-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.size-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+}
+
+.size-stock {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.size-input {
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.empty-queue-view {
+  padding: 32px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.empty-queue-icon {
+  color: var(--text-muted);
+  animation: rotate 6s linear infinite;
+}
+
+.empty-queue-view h5 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.empty-queue-view span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.4;
+}
+
+/* Viewport Live Preview */
+.live-preview-viewport {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  overflow: auto;
+}
+
+.preview-disclaimer {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* --- ESTILOS DE ESTRUTURA DA ETIQUETA --- */
+
+.etiqueta-layout-card {
+  background-color: #ffffff;
+  color: #000000;
+  padding: 3mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  user-select: none;
+}
+
+.etiqueta-inner-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.etiqueta-badge-header {
+  font-size: 5pt;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #888888;
+  letter-spacing: 0.5px;
+  border-bottom: 0.5px solid #eaeaea;
+  padding-bottom: 1.5px;
+  margin-bottom: 1.5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.etiqueta-prod-name {
+  font-size: 7.5pt;
+  font-weight: 800;
+  color: #111111;
+  text-align: center;
+  line-height: 1.1;
+  margin-bottom: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.etiqueta-body-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 3mm;
+  flex: 1;
+}
+
+.etiqueta-qr-wrapper {
+  width: 12mm;
+  height: 12mm;
+  min-width: 12mm;
+  min-height: 12mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+}
+
+.etiqueta-qr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.etiqueta-info-text-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.5px;
+  text-align: left;
+}
+
+.etiqueta-tam-text {
+  font-size: 6.5pt;
+  color: #555555;
+  white-space: nowrap;
+}
+
+.etiqueta-price-text {
+  font-size: 8.5pt;
+  font-weight: 900;
+  color: #000000;
+  white-space: nowrap;
+}
+
+.etiqueta-bar-text {
+  font-size: 5.5pt;
+  color: #777777;
+  white-space: nowrap;
+}
+
+/* Modificações baseadas no formato selecionado */
+.etiqueta-layout-card.format-redondo {
+  border-radius: 50%;
+  padding: 4mm;
+}
+
+.etiqueta-layout-card.format-retangular_h .etiqueta-inner-content {
+  justify-content: center;
+}
+
+.etiqueta-layout-card.format-retangular_v .etiqueta-body-grid {
+  flex-direction: column;
+  gap: 1.5mm;
+}
+
+.etiqueta-layout-card.format-retangular_v .etiqueta-info-text-group {
+  text-align: center;
+  align-items: center;
+}
+
+/* Placeholder e mocks */
+.mock-qr {
+  border: 1px dashed #cccccc;
+  background-color: #fafafa;
+}
+
+.qr-box-pattern {
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(45deg, #eee 25%, transparent 25%), 
+    linear-gradient(-45deg, #eee 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #eee 75%), 
+    linear-gradient(-45deg, transparent 75%, #eee 75%);
+  background-size: 4px 4px;
+}
+
+.preview-placeholder .etiqueta-prod-name {
+  color: #777777;
+}
+
+/* --- ELEMENTO INVISÍVEL NO MONITOR --- */
+.folha-impressao-etiquetas {
+  display: none; /* Totalmente oculto no browser */
+}
+
+/* --- REGRAS CRÍTICAS PARA IMPRESSÃO (@MEDIA PRINT) --- */
+@media print {
+  /* Ocultar absolutamente tudo da tela do ERP */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Resetar margens de página do navegador */
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  /* Exibir exclusivamente o contêiner de etiquetas */
+  .folha-impressao-etiquetas,
+  .folha-impressao-etiquetas * {
+    visibility: visible;
+  }
+
+  .folha-impressao-etiquetas {
+    display: grid !important; /* Força exibição como Grid de Impressão */
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background-color: #ffffff;
+    box-shadow: none;
+    z-index: 9999;
+  }
+
+  .etiqueta-layout-card {
+    border: 1px solid #eaeaea; /* Borda suave para recortar se necessário */
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

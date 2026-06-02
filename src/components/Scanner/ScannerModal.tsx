@@ -7,10 +7,18 @@ interface ScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess: (decodedText: string, mode: 'venda' | 'consulta') => void;
+  initialMode?: 'venda' | 'consulta';
+  lockMode?: boolean;
 }
 
-export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onScanSuccess }) => {
-  const [scanMode, setScanMode] = useState<'venda' | 'consulta'>('venda');
+export const ScannerModal: React.FC<ScannerModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onScanSuccess,
+  initialMode = 'venda',
+  lockMode = false
+}) => {
+  const [scanMode, setScanMode] = useState<'venda' | 'consulta'>(initialMode);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [cameras, setCameras] = useState<any[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string>('');
@@ -19,6 +27,11 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onS
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null);
+  const isOpenRef = useRef(isOpen);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
   const readerId = 'scanner-video-container';
 
   // Bipe sonoro sintetizado nativamente via Web Audio API
@@ -41,6 +54,13 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onS
       console.warn('Erro ao reproduzir áudio nativo:', e);
     }
   };
+
+  // Sincronizar o modo de escaneamento quando o modal for aberto
+  useEffect(() => {
+    if (isOpen) {
+      setScanMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
 
   // Inicializar e configurar câmeras
   useEffect(() => {
@@ -123,6 +143,12 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onS
         }
       );
 
+      // Se o modal foi fechado durante a inicialização assíncrona, para imediatamente
+      if (!isOpenRef.current) {
+        await stopScanner();
+        return;
+      }
+
       setIsLoading(false);
     } catch (err: any) {
       console.error('Erro ao iniciar Html5Qrcode:', err);
@@ -132,9 +158,11 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onS
   };
 
   const stopScanner = async () => {
-    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+    if (html5QrcodeRef.current) {
       try {
-        await html5QrcodeRef.current.stop();
+        if (html5QrcodeRef.current.isScanning) {
+          await html5QrcodeRef.current.stop();
+        }
       } catch (err) {
         console.error('Erro ao parar Html5Qrcode:', err);
       }
@@ -162,10 +190,8 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onS
     setActiveCameraId(cameras[nextIndex].id);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="scanner-modal-overlay">
+    <div className="scanner-modal-overlay" style={{ display: isOpen ? 'flex' : 'none' }}>
       <div className="scanner-modal-card glass">
         {/* Header */}
         <div className="scanner-modal-header">
@@ -179,22 +205,24 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onS
         </div>
 
         {/* Alternador de Modo */}
-        <div className="scanner-mode-switch-wrapper">
-          <button
-            onClick={() => setScanMode('venda')}
-            className={`scanner-mode-tab ${scanMode === 'venda' ? 'active venda' : ''}`}
-          >
-            <ShoppingBag size={16} />
-            <span>Vender Produto</span>
-          </button>
-          <button
-            onClick={() => setScanMode('consulta')}
-            className={`scanner-mode-tab ${scanMode === 'consulta' ? 'active consulta' : ''}`}
-          >
-            <Search size={16} />
-            <span>Consultar Preço</span>
-          </button>
-        </div>
+        {!lockMode && (
+          <div className="scanner-mode-switch-wrapper">
+            <button
+              onClick={() => setScanMode('venda')}
+              className={`scanner-mode-tab ${scanMode === 'venda' ? 'active venda' : ''}`}
+            >
+              <ShoppingBag size={16} />
+              <span>Vender Produto</span>
+            </button>
+            <button
+              onClick={() => setScanMode('consulta')}
+              className={`scanner-mode-tab ${scanMode === 'consulta' ? 'active consulta' : ''}`}
+            >
+              <Search size={16} />
+              <span>Consultar Preço</span>
+            </button>
+          </div>
+        )}
 
         {/* Viewfinder da Câmera */}
         <div className="scanner-viewfinder-container">

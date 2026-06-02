@@ -42,6 +42,9 @@ export const PDV: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [desconto, setDesconto] = useState(0);
   const [showTamanhoModal, setShowTamanhoModal] = useState<Produto | null>(null);
+  const [showConsultaModal, setShowConsultaModal] = useState(false);
+  const [buscaConsulta, setBuscaConsulta] = useState('');
+  const [scannerMode, setScannerMode] = useState<'venda' | 'consulta'>('venda');
   
   // Modais de fechamento
   const [showCheckout, setShowCheckout] = useState(false);
@@ -96,6 +99,13 @@ export const PDV: React.FC = () => {
     p.codigoInterno.includes(searchNormalized)
   );
 
+  const searchConsultaNormalized = buscaConsulta.toLowerCase();
+  const produtosFiltradosConsulta = buscaConsulta.trim() === '' ? [] : produtos.filter(p => 
+    p.nome.toLowerCase().includes(searchConsultaNormalized) || 
+    p.codigoBarras.includes(searchConsultaNormalized) ||
+    p.codigoInterno.includes(searchConsultaNormalized)
+  );
+
   // --- OPERAÇÕES DO PDV ---
   const handleScanSuccess = (decodedText: string, mode: 'venda' | 'consulta') => {
     // 1. Identificar se é QR Code estruturado do GlowPOS: glowpos:id_produto:tamanho
@@ -130,6 +140,7 @@ export const PDV: React.FC = () => {
     } else {
       setShowScanner(false);
       setConsultarProduto(prod);
+      setShowConsultaModal(false);
     }
   };
 
@@ -364,10 +375,35 @@ export const PDV: React.FC = () => {
         {/* COLUNA ESQUERDA: PRODUTOS E BUSCA */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="card glass" style={{ padding: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Search size={18} className="text-secondary" />
-              Pesquisa Rápida de Produtos
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Search size={18} className="text-secondary" />
+                Pesquisa Rápida de Produtos
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setBuscaConsulta('');
+                  setShowConsultaModal(true);
+                }}
+                className="btn btn-secondary btn-sm"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
+                  borderRadius: 'var(--radius-xs)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                <Search size={14} className="text-primary" />
+                Consultar Preço
+              </button>
+            </div>
             
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
@@ -383,7 +419,10 @@ export const PDV: React.FC = () => {
               </div>
               
               <button 
-                onClick={() => setShowScanner(true)}
+                onClick={() => {
+                  setScannerMode('venda');
+                  setShowScanner(true);
+                }}
                 className="btn btn-primary btn-icon"
                 style={{ borderRadius: 'var(--radius-full)', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 title="Escanear com a câmera"
@@ -952,11 +991,102 @@ export const PDV: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL DE CONSULTA DE PREÇO INDEPENDENTE */}
+      {showConsultaModal && (
+        <div className="modal-overlay" onClick={() => setShowConsultaModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Search size={20} className="text-primary" />
+                Consulta de Preço
+              </h2>
+              <button onClick={() => setShowConsultaModal(false)} className="btn-secondary btn-icon" style={{ borderRadius: '50%' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Pesquise o produto pelo nome/código abaixo ou clique na câmera para escanear o QR Code de etiqueta.
+              </p>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <input
+                    type="text"
+                    placeholder="Busque por Nome, Código..."
+                    value={buscaConsulta}
+                    onChange={(e) => setBuscaConsulta(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '40px', borderRadius: 'var(--radius-full)' }}
+                    autoFocus
+                  />
+                  <Search size={16} style={{ position: 'absolute', left: '16px', top: '15px', color: 'var(--text-muted)' }} />
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    setScannerMode('consulta');
+                    setShowScanner(true);
+                  }}
+                  className="btn btn-primary btn-icon"
+                  style={{ borderRadius: 'var(--radius-full)', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Escanear com a câmera"
+                >
+                  <Camera size={18} />
+                </button>
+              </div>
+
+              {/* LISTA RESULTADO BUSCA CONSULTA */}
+              {buscaConsulta.trim() !== '' && (
+                <div className="glass" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', maxHeight: '220px', overflowY: 'auto', padding: '6px' }}>
+                  {produtosFiltradosConsulta.length === 0 ? (
+                    <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      Nenhum produto localizado
+                    </div>
+                  ) : (
+                    produtosFiltradosConsulta.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setConsultarProduto(p);
+                          setShowConsultaModal(false);
+                          setBuscaConsulta('');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid var(--border-color)',
+                          textAlign: 'left',
+                          fontSize: '0.85rem'
+                        }}
+                        className="btn-secondary"
+                      >
+                        <div>
+                          <strong>{p.nome}</strong>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cód: {p.codigoInterno} | Marca: {p.marca}</div>
+                        </div>
+                        <strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(p.precoVenda)}</strong>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SCANNER VIA CÂMERA INTEGRADO */}
       <ScannerModal
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
         onScanSuccess={handleScanSuccess}
+        initialMode={scannerMode}
+        lockMode={true}
       />
 
       {/* MODAL CONSULTA DE PREÇO DO PRODUTO */}

@@ -32,7 +32,20 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
+
   const readerId = 'scanner-video-container';
+
+  // Inicializa a instância do Html5Qrcode uma única vez no mount do componente
+  useEffect(() => {
+    const html5Qrcode = new Html5Qrcode(readerId);
+    html5QrcodeRef.current = html5Qrcode;
+
+    return () => {
+      if (html5Qrcode.isScanning) {
+        html5Qrcode.stop().catch(err => console.error('Erro ao parar no unmount:', err));
+      }
+    };
+  }, []);
 
   // Bipe sonoro sintetizado nativamente via Web Audio API
   const playBeep = () => {
@@ -65,6 +78,14 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   // Inicializar e configurar câmeras
   useEffect(() => {
     if (!isOpen) return;
+
+    // Se já temos as câmeras listadas e permissão, pula a API e inicia diretamente
+    if (cameras.length > 0 && hasPermission) {
+      setIsLoading(false);
+      return () => {
+        stopScanner();
+      };
+    }
 
     setIsLoading(true);
     setErrorMessage('');
@@ -101,7 +122,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       // Garantir desligamento total da câmera ao fechar o modal
       stopScanner();
     };
-  }, [isOpen]);
+  }, [isOpen, cameras.length, hasPermission]);
 
   // Iniciar leitura sempre que a câmera ativa mudar
   useEffect(() => {
@@ -115,11 +136,15 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     setErrorMessage('');
 
     try {
-      // Se houver um scanner anterior rodando, encerra ele antes
-      await stopScanner();
+      const html5Qrcode = html5QrcodeRef.current;
+      if (!html5Qrcode) {
+        throw new Error('Instância do Html5Qrcode não foi inicializada.');
+      }
 
-      const html5Qrcode = new Html5Qrcode(readerId);
-      html5QrcodeRef.current = html5Qrcode;
+      // Parar qualquer escaneamento ativo antes de iniciar
+      if (html5Qrcode.isScanning) {
+        await html5Qrcode.stop();
+      }
 
       const config = {
         fps: 15,
@@ -145,7 +170,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
       // Se o modal foi fechado durante a inicialização assíncrona, para imediatamente
       if (!isOpenRef.current) {
-        await stopScanner();
+        await html5Qrcode.stop();
         return;
       }
 
@@ -158,15 +183,13 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   };
 
   const stopScanner = async () => {
-    if (html5QrcodeRef.current) {
+    const html5Qrcode = html5QrcodeRef.current;
+    if (html5Qrcode && html5Qrcode.isScanning) {
       try {
-        if (html5QrcodeRef.current.isScanning) {
-          await html5QrcodeRef.current.stop();
-        }
+        await html5Qrcode.stop();
       } catch (err) {
         console.error('Erro ao parar Html5Qrcode:', err);
       }
-      html5QrcodeRef.current = null;
     }
   };
 
@@ -243,10 +266,9 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           <div 
             id={readerId} 
             className={`scanner-video-frame ${scanFeedback ? 'scan-success-flash' : ''}`}
-          >
-            {/* Linha laser de scan simulada */}
-            {!isLoading && !errorMessage && <div className="scanner-laser-line"></div>}
-          </div>
+          />
+          {/* Linha laser de scan simulada por fora para não interferir no DOM do React */}
+          {!isLoading && !errorMessage && <div className="scanner-laser-line"></div>}
         </div>
 
         {/* Rodapé e Controles */}

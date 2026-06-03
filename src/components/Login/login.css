@@ -409,3 +409,60 @@
   background-color: #ffffff;
   color: #0f172a;
 }
+
+/* =========================================================================
+   CAIXA DE AVISO DO MODO OFFLINE/DEMO (CONTRASTE UNIVERSAL)
+   ========================================================================= */
+.offline-demo-alert {
+  background: linear-gradient(135deg, rgba(20, 12, 38, 0.96) 0%, rgba(12, 16, 38, 0.96) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.5) !important;
+  border-radius: 14px !important;
+  padding: 16px !important;
+  margin-bottom: 1.5rem !important;
+  font-size: 0.875rem !important;
+  color: #f1f5f9 !important; /* Forçar cor clara para contraste com fundo escuro do card */
+  text-align: left !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+  line-height: 1.5 !important;
+  animation: slide-in-msg 0.3s ease-out;
+  box-sizing: border-box !important;
+}
+
+.offline-demo-alert p {
+  color: #e2e8f0 !important; /* Garantir que parágrafos herdem cor clara */
+  margin: 0 0 10px 0 !important;
+  font-size: 0.875rem !important;
+}
+
+.offline-demo-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: #c084fc !important; /* Título lilás claro de alto contraste */
+  font-weight: 700 !important;
+  margin-bottom: 10px !important;
+  font-size: 0.95rem !important;
+}
+
+.offline-demo-tips {
+  margin-top: 10px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  font-size: 0.825rem !important;
+  color: #cbd5e1 !important; /* Dicas em cinza claro */
+  opacity: 0.95 !important;
+  line-height: 1.6 !important;
+}
+
+.offline-demo-tips code {
+  background: rgba(168, 85, 247, 0.25) !important;
+  color: #f3e8ff !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-family: monospace !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+  display: inline-block !important;
+  margin: 2px !important;
+}

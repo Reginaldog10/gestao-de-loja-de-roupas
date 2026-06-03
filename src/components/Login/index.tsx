@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import type { UserProfile } from '../../context/AuthContext';
 import { Mail, Lock, User, Shield, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { isOfflineMode } from '../../utils/supabaseClient';
 import './login.css';
 
 export const Login: React.FC = () => {
@@ -109,6 +110,22 @@ export const Login: React.FC = () => {
         {successMsg && (
           <div className="auth-message success-message">
             <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Modo Demo Informações */}
+        {isOfflineMode && (
+          <div className="offline-demo-alert">
+            <div className="offline-demo-title">
+              <Sparkles size={16} />
+              <span>Modo Demo Local Ativo</span>
+            </div>
+            <p style={{ margin: 0 }}>
+              As credenciais do Supabase não estão configuradas no arquivo <code>.env</code>. Os dados serão salvos localmente no seu navegador.
+            </p>
+            <div className="offline-demo-tips">
+              💡 <strong>Dica de Login:</strong> Use qualquer email contendo <code>admin</code>, <code>caixa</code> ou <code>vendedor</code> (ex: <code>admin@demo.com</code>) para testar os diferentes perfis do sistema.
+            </div>
           </div>
         )}
 

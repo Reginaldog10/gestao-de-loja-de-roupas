@@ -14,6 +14,7 @@ import {
   Search,
   LogOut
 } from 'lucide-react';
+import { isOfflineMode } from '../../utils/supabaseClient';
 import './layout.css';
 
 interface LayoutProps {
@@ -67,6 +68,25 @@ export const Layout: React.FC<LayoutProps> = ({
           <h2>GlowPOS</h2>
           <span className="brand-badge">ERP</span>
         </div>
+
+        {isOfflineMode && (
+          <div className="demo-mode-indicator-sidebar" style={{
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(99, 102, 241, 0.25) 100%)',
+            border: '1px solid rgba(168, 85, 247, 0.4)',
+            color: '#c084fc',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            textAlign: 'center',
+            padding: '5px 10px',
+            borderRadius: '20px',
+            margin: '0 24px 16px 24px',
+            boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            Modo Demo Local
+          </div>
+        )}
 
         <nav className="sidebar-nav">
           {navigationItems.map((item) => {

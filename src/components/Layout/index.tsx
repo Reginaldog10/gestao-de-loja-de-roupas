@@ -11,7 +11,8 @@ import {
   Sun, 
   Moon, 
   ShieldAlert,
-  Search
+  Search,
+  LogOut
 } from 'lucide-react';
 import './layout.css';
 
@@ -30,7 +31,7 @@ export const Layout: React.FC<LayoutProps> = ({
   searchTerm,
   setSearchTerm
 }) => {
-  const { currentProfile, setProfile } = useAuth();
+  const { currentProfile, setProfile, logout, user } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('erp_theme');
     if (saved === 'dark') {
@@ -84,7 +85,15 @@ export const Layout: React.FC<LayoutProps> = ({
         </nav>
 
         <div className="sidebar-footer">
-          <div className="profile-badge-container">
+          <div className="user-info-sidebar" style={{ marginBottom: '12px', padding: '0 8px' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {user?.user_metadata?.nome || user?.email?.split('@')[0]}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>
+              Perfil: {currentProfile}
+            </div>
+          </div>
+          <div className="profile-badge-container" style={{ marginBottom: '12px' }}>
             <ShieldAlert size={16} className="profile-icon" />
             <select
               value={currentProfile}
@@ -96,6 +105,27 @@ export const Layout: React.FC<LayoutProps> = ({
               <option value="vendedor">Vendedor (Estoque/Venda)</option>
             </select>
           </div>
+          <button 
+            onClick={logout} 
+            className="sidebar-nav-item" 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              width: '100%', 
+              padding: '10px 16px', 
+              background: 'rgba(239, 68, 68, 0.1)', 
+              color: '#ef4444', 
+              border: 'none', 
+              borderRadius: 'var(--radius-sm)', 
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.9rem'
+            }}
+          >
+            <LogOut size={18} />
+            <span>Sair</span>
+          </button>
         </div>
       </aside>
 
@@ -115,8 +145,13 @@ export const Layout: React.FC<LayoutProps> = ({
 
           <div className="header-actions">
             {/* Tema Toggle */}
-            <button onClick={toggleTheme} className="theme-toggle-btn btn-secondary btn-icon" title="Alternar tema">
+             <button onClick={toggleTheme} className="theme-toggle-btn btn-secondary btn-icon" title="Alternar tema">
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+            </button>
+
+            {/* Botão de Logout no Header (Mobile/Desktop) */}
+            <button onClick={logout} className="theme-toggle-btn btn-secondary btn-icon" title="Sair do sistema" style={{ color: '#ef4444' }}>
+              <LogOut size={20} />
             </button>
 
             {/* Profile Dropdown para Mobile */}

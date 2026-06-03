@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
+import type { User } from '@supabase/supabase-js';
 
 export type UserProfile = 'administrador' | 'vendedor' | 'caixa';
 
@@ -12,10 +14,15 @@ export interface PermissionGate {
 }
 
 interface AuthContextType {
+  user: User | null;
   currentProfile: UserProfile;
-  setProfile: (profile: UserProfile) => void;
+  setProfile: (profile: UserProfile) => void; // Mantido para compatibilidade, mas atualiza no banco
   permissions: PermissionGate;
   hasAccess: (permission: keyof PermissionGate) => boolean;
+  login: (email: string, senha: string) => Promise<{ error: any }>;
+  signup: (email: string, senha: string, nome: string, perfil: UserProfile) => Promise<{ error: any }>;
+  logout: () => Promise<void>;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,22 +55,120 @@ const PERMISSION_MAP: Record<UserProfile, PermissionGate> = {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentProfile, setCurrentProfileState] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('erp_user_profile');
-    return (saved as UserProfile) || 'administrador';
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [currentProfile, setCurrentProfileState] = useState<UserProfile>('vendedor');
+  const [permissions, setPermissions] = useState<PermissionGate>(PERMISSION_MAP.vendedor);
+  const [loading, setLoading] = useState(true);
 
-  const [permissions, setPermissions] = useState<PermissionGate>(
-    PERMISSION_MAP[currentProfile]
-  );
+  // Função para buscar o perfil do banco ou fallback para os metadados do usuário
+  const fetchUserProfile = async (currentUser: User) => {
+    try {
+      // 1. Tentar buscar na tabela de perfis
+      const { data, error } = await supabase
+        .from('perfis')
+        .select('perfil')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (error || !data) {
+        // 2. Fallback defensivo: ler de user_metadata caso o trigger do banco não tenha rodado ainda
+        const metadataPerfil = currentUser.user_metadata?.perfil as UserProfile;
+        if (metadataPerfil && PERMISSION_MAP[metadataPerfil]) {
+          setCurrentProfileState(metadataPerfil);
+          setPermissions(PERMISSION_MAP[metadataPerfil]);
+        } else {
+          // Padrão seguro
+          setCurrentProfileState('vendedor');
+          setPermissions(PERMISSION_MAP.vendedor);
+        }
+      } else {
+        const dbPerfil = data.perfil as UserProfile;
+        setCurrentProfileState(dbPerfil);
+        setPermissions(PERMISSION_MAP[dbPerfil]);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar perfil do usuário:', err);
+      // Fallback em caso de falha de conexão/tabela inexistente
+      setCurrentProfileState('vendedor');
+      setPermissions(PERMISSION_MAP.vendedor);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('erp_user_profile', currentProfile);
-    setPermissions(PERMISSION_MAP[currentProfile]);
-  }, [currentProfile]);
+    // Verificar sessão atual
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserProfile(session.user);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    });
 
-  const setProfile = (profile: UserProfile) => {
+    // Ouvir mudanças no estado de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        await fetchUserProfile(session.user);
+      } else {
+        setUser(null);
+        setCurrentProfileState('vendedor');
+        setPermissions(PERMISSION_MAP.vendedor);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const login = async (email: string, senha: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: senha,
+    });
+    return { data, error };
+  };
+
+  const signup = async (email: string, senha: string, nome: string, perfil: UserProfile) => {
+    // Criamos o usuário passando dados adicionais em user_metadata
+    // Esses dados são lidos pelo trigger do banco de dados do Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: senha,
+      options: {
+        data: {
+          nome,
+          perfil,
+        },
+      },
+    });
+    return { data, error };
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  // Mantido para compatibilidade e troca rápida se o usuário for administrador e quiser simular,
+  // ou se ele atualizar o perfil nas configurações.
+  const setProfile = async (profile: UserProfile) => {
     setCurrentProfileState(profile);
+    setPermissions(PERMISSION_MAP[profile]);
+    
+    // Se o usuário estiver logado, tenta sincronizar a alteração de perfil no banco de dados
+    if (user) {
+      try {
+        await supabase
+          .from('perfis')
+          .update({ perfil: profile })
+          .eq('id', user.id);
+      } catch (err) {
+        console.error('Erro ao atualizar perfil no banco:', err);
+      }
+    }
   };
 
   const hasAccess = (permission: keyof PermissionGate): boolean => {
@@ -71,7 +176,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ currentProfile, setProfile, permissions, hasAccess }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      currentProfile, 
+      setProfile, 
+      permissions, 
+      hasAccess, 
+      login, 
+      signup, 
+      logout,
+      loading 
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { generateId } from '../utils/formatters';
+import { supabase } from '../utils/supabaseClient';
+import { useAuth } from './AuthContext';
 
 // --- DEFINIÇÕES DE INTERFACES ---
 
@@ -304,8 +306,8 @@ const INITIAL_PRODUTOS: Produto[] = [
     tamanhos: [
       { tamanho: '38', estoque: 4 },
       { tamanho: '40', estoque: 12 },
-      { tamanho: '42', estoque: 0 }, // Sem estoque
-      { tamanho: '44', estoque: 2 } // Baixo estoque
+      { tamanho: '42', estoque: 0 },
+      { tamanho: '44', estoque: 2 }
     ],
     fornecedorId: 'FOR1',
     precoCusto: 55.00,
@@ -396,14 +398,13 @@ const INITIAL_VENDAS: Venda[] = [
 ];
 
 const INITIAL_PARCELAS: Parcela[] = [
-  // Parcelas da VEN1 (Ana Silva - R$ 280 em 2 parcelas - Paga e Paga Parcial)
   {
     id: 'PARC1',
     vendaId: 'VEN1',
     clienteId: 'CLI1',
     numeroParcela: 1,
     totalParcelas: 2,
-    dataVencimento: getHojeOffset(-10), // Venceu há 10 dias
+    dataVencimento: getHojeOffset(-10),
     valorOriginal: 140.00,
     valorRestante: 0,
     status: 'paga',
@@ -416,21 +417,20 @@ const INITIAL_PARCELAS: Parcela[] = [
     clienteId: 'CLI1',
     numeroParcela: 2,
     totalParcelas: 2,
-    dataVencimento: getHojeOffset(10), // Vence daqui a 10 dias
+    dataVencimento: getHojeOffset(10),
     valorOriginal: 140.00,
     valorRestante: 140.00,
     status: 'em_aberto',
     pagamentos: [],
     observacoes: ''
   },
-  // Parcelas da VEN2 (Carlos Eduardo - R$ 400 em 4 parcelas de R$ 100 - Inadimplente)
   {
     id: 'PARC3',
     vendaId: 'VEN2',
     clienteId: 'CLI2',
     numeroParcela: 1,
     totalParcelas: 4,
-    dataVencimento: getHojeOffset(-15), // Vencida
+    dataVencimento: getHojeOffset(-15),
     valorOriginal: 100.00,
     valorRestante: 100.00,
     status: 'vencida',
@@ -443,7 +443,7 @@ const INITIAL_PARCELAS: Parcela[] = [
     clienteId: 'CLI2',
     numeroParcela: 2,
     totalParcelas: 4,
-    dataVencimento: getHojeOffset(-15), // Vencida
+    dataVencimento: getHojeOffset(-15),
     valorOriginal: 100.00,
     valorRestante: 100.00,
     status: 'vencida',
@@ -456,7 +456,7 @@ const INITIAL_PARCELAS: Parcela[] = [
     clienteId: 'CLI2',
     numeroParcela: 3,
     totalParcelas: 4,
-    dataVencimento: getHojeOffset(0), // Vence hoje
+    dataVencimento: getHojeOffset(0),
     valorOriginal: 100.00,
     valorRestante: 80.00,
     status: 'paga_parcial',
@@ -469,7 +469,7 @@ const INITIAL_PARCELAS: Parcela[] = [
     clienteId: 'CLI2',
     numeroParcela: 4,
     totalParcelas: 4,
-    dataVencimento: getHojeOffset(15), // A vencer
+    dataVencimento: getHojeOffset(15),
     valorOriginal: 100.00,
     valorRestante: 100.00,
     status: 'em_aberto',
@@ -482,7 +482,234 @@ const INITIAL_LOGS: LogOperacao[] = [
   { id: 'LOG1', data: getHojeOffset(-10), usuario: 'Sistema', acao: 'Inicialização', detalhe: 'Sistema configurado com dados de demonstração.' }
 ];
 
+// --- CONVERSORES DE MAPEAMENTO DE BANCO DE DADOS (SNAKE_CASE PARA CAMELCASE) ---
+
+const mapClienteFromDB = (db: any): Cliente => ({
+  id: db.id,
+  nome: db.nome,
+  cpf: db.cpf || '',
+  rg: db.rg || '',
+  dataNascimento: db.data_nascimento || '',
+  telefone: db.telefone || '',
+  whatsapp: db.whatsapp || '',
+  endereco: db.endereco || '',
+  cidade: db.cidade || '',
+  limiteCredito: Number(db.limite_credito) || 0,
+  observacoes: db.observacoes || '',
+  foto: db.foto || '',
+  totalComprado: Number(db.total_comprado) || 0,
+  totalDivida: Number(db.total_divida) || 0
+});
+
+const mapClienteToDB = (c: Partial<Cliente>) => {
+  const db: any = {};
+  if (c.id !== undefined) db.id = c.id;
+  if (c.nome !== undefined) db.nome = c.nome;
+  if (c.cpf !== undefined) db.cpf = c.cpf;
+  if (c.rg !== undefined) db.rg = c.rg;
+  if (c.dataNascimento !== undefined) db.data_nascimento = c.dataNascimento;
+  if (c.telefone !== undefined) db.telefone = c.telefone;
+  if (c.whatsapp !== undefined) db.whatsapp = c.whatsapp;
+  if (c.endereco !== undefined) db.endereco = c.endereco;
+  if (c.cidade !== undefined) db.cidade = c.cidade;
+  if (c.limiteCredito !== undefined) db.limite_credito = c.limiteCredito;
+  if (c.observacoes !== undefined) db.observacoes = c.observacoes;
+  if (c.foto !== undefined) db.foto = c.foto;
+  if (c.totalComprado !== undefined) db.total_comprado = c.totalComprado;
+  if (c.totalDivida !== undefined) db.total_divida = c.totalDivida;
+  return db;
+};
+
+const mapFornecedorFromDB = (db: any): Fornecedor => ({
+  id: db.id,
+  razaoSocial: db.razao_social,
+  nomeFantasia: db.nome_fantasia,
+  cnpj: db.cnpj || '',
+  telefone: db.telefone || '',
+  whatsapp: db.whatsapp || '',
+  email: db.email || '',
+  endereco: db.endereco || '',
+  observacoes: db.observacoes || ''
+});
+
+const mapFornecedorToDB = (f: Partial<Fornecedor>) => {
+  const db: any = {};
+  if (f.id !== undefined) db.id = f.id;
+  if (f.razaoSocial !== undefined) db.razao_social = f.razaoSocial;
+  if (f.nomeFantasia !== undefined) db.nome_fantasia = f.nomeFantasia;
+  if (f.cnpj !== undefined) db.cnpj = f.cnpj;
+  if (f.telefone !== undefined) db.telefone = f.telefone;
+  if (f.whatsapp !== undefined) db.whatsapp = f.whatsapp;
+  if (f.email !== undefined) db.email = f.email;
+  if (f.endereco !== undefined) db.endereco = f.endereco;
+  if (f.observacoes !== undefined) db.observacoes = f.observacoes;
+  return db;
+};
+
+const mapProdutoFromDB = (db: any): Produto => ({
+  id: db.id,
+  codigoInterno: db.codigo_interno,
+  codigoBarras: db.codigo_barras || '',
+  nome: db.nome,
+  categoria: db.categoria || '',
+  marca: db.marca || '',
+  cor: db.cor || '',
+  tamanhos: db.tamanhos || [],
+  fornecedorId: db.fornecedor_id || '',
+  precoCusto: Number(db.preco_custo) || 0,
+  precoVenda: Number(db.preco_venda) || 0,
+  estoqueMinimo: Number(db.estoque_minimo) || 0,
+  foto: db.foto || ''
+});
+
+const mapProdutoToDB = (p: Partial<Produto>) => {
+  const db: any = {};
+  if (p.id !== undefined) db.id = p.id;
+  if (p.codigoInterno !== undefined) db.codigo_interno = p.codigoInterno;
+  if (p.codigoBarras !== undefined) db.codigo_barras = p.codigoBarras;
+  if (p.nome !== undefined) db.nome = p.nome;
+  if (p.categoria !== undefined) db.categoria = p.categoria;
+  if (p.marca !== undefined) db.marca = p.marca;
+  if (p.cor !== undefined) db.cor = p.cor;
+  if (p.tamanhos !== undefined) db.tamanhos = p.tamanhos;
+  if (p.fornecedorId !== undefined) db.fornecedor_id = p.fornecedorId;
+  if (p.precoCusto !== undefined) db.preco_custo = p.precoCusto;
+  if (p.precoVenda !== undefined) db.preco_venda = p.precoVenda;
+  if (p.estoqueMinimo !== undefined) db.estoque_minimo = p.estoqueMinimo;
+  if (p.foto !== undefined) db.foto = p.foto;
+  return db;
+};
+
+const mapMovimentacaoFromDB = (db: any): MovimentacaoEstoque => ({
+  id: db.id,
+  produtoId: db.produto_id,
+  tamanho: db.tamanho,
+  tipo: db.tipo,
+  motivo: db.motivo,
+  quantidade: Number(db.quantidade),
+  data: db.data,
+  observacao: db.observacao || '',
+  usuario: db.usuario
+});
+
+const mapMovimentacaoToDB = (m: Partial<MovimentacaoEstoque>) => {
+  const db: any = {};
+  if (m.id !== undefined) db.id = m.id;
+  if (m.produtoId !== undefined) db.produto_id = m.produtoId;
+  if (m.tamanho !== undefined) db.tamanho = m.tamanho;
+  if (m.tipo !== undefined) db.tipo = m.tipo;
+  if (m.motivo !== undefined) db.motivo = m.motivo;
+  if (m.quantidade !== undefined) db.quantidade = m.quantidade;
+  if (m.data !== undefined) db.data = m.data;
+  if (m.observacao !== undefined) db.observacao = m.observacao;
+  if (m.usuario !== undefined) db.usuario = m.usuario;
+  return db;
+};
+
+const mapEncomendaFromDB = (db: any): Encomenda => ({
+  id: db.id,
+  clienteId: db.cliente_id,
+  produtoId: db.produto_id,
+  tamanho: db.tamanho,
+  quantidade: Number(db.quantidade),
+  valor: Number(db.valor),
+  dataPedido: db.data_pedido,
+  previsaoEntrega: db.previsao_entrega || '',
+  status: db.status,
+  observacoes: db.observacoes || ''
+});
+
+const mapEncomendaToDB = (e: Partial<Encomenda>) => {
+  const db: any = {};
+  if (e.id !== undefined) db.id = e.id;
+  if (e.clienteId !== undefined) db.cliente_id = e.clienteId;
+  if (e.produtoId !== undefined) db.produto_id = e.produtoId;
+  if (e.tamanho !== undefined) db.tamanho = e.tamanho;
+  if (e.quantidade !== undefined) db.quantidade = e.quantidade;
+  if (e.valor !== undefined) db.valor = e.valor;
+  if (e.dataPedido !== undefined) db.data_pedido = e.dataPedido;
+  if (e.previsaoEntrega !== undefined) db.previsao_entrega = e.previsaoEntrega;
+  if (e.status !== undefined) db.status = e.status;
+  if (e.observacoes !== undefined) db.observacoes = e.observacoes;
+  return db;
+};
+
+const mapVendaFromDB = (db: any): Venda => ({
+  id: db.id,
+  clienteId: db.cliente_id || undefined,
+  data: db.data,
+  subtotal: Number(db.subtotal),
+  desconto: Number(db.desconto),
+  total: Number(db.total),
+  formasPagamento: db.formas_pagamento || [],
+  produtos: db.produtos || [],
+  usuario: db.usuario
+});
+
+const mapVendaToDB = (v: Partial<Venda>) => {
+  const db: any = {};
+  if (v.id !== undefined) db.id = v.id;
+  if (v.clienteId !== undefined) db.cliente_id = v.clienteId || null;
+  if (v.data !== undefined) db.data = v.data;
+  if (v.subtotal !== undefined) db.subtotal = v.subtotal;
+  if (v.desconto !== undefined) db.desconto = v.desconto;
+  if (v.total !== undefined) db.total = v.total;
+  if (v.formasPagamento !== undefined) db.formas_pagamento = v.formasPagamento;
+  if (v.produtos !== undefined) db.produtos = v.produtos;
+  if (v.usuario !== undefined) db.usuario = v.usuario;
+  return db;
+};
+
+const mapParcelaFromDB = (db: any): Parcela => ({
+  id: db.id,
+  vendaId: db.venda_id,
+  clienteId: db.cliente_id,
+  numeroParcela: Number(db.numero_parcela),
+  totalParcelas: Number(db.total_parcelas),
+  dataVencimento: db.data_vencimento,
+  valorOriginal: Number(db.valor_original),
+  valorRestante: Number(db.valor_restante),
+  status: db.status,
+  pagamentos: db.pagamentos || [],
+  observacoes: db.observacoes || ''
+});
+
+const mapParcelaToDB = (p: Partial<Parcela>) => {
+  const db: any = {};
+  if (p.id !== undefined) db.id = p.id;
+  if (p.vendaId !== undefined) db.venda_id = p.vendaId;
+  if (p.clienteId !== undefined) db.cliente_id = p.clienteId;
+  if (p.numeroParcela !== undefined) db.numero_parcela = p.numeroParcela;
+  if (p.totalParcelas !== undefined) db.total_parcelas = p.totalParcelas;
+  if (p.dataVencimento !== undefined) db.data_vencimento = p.dataVencimento;
+  if (p.valorOriginal !== undefined) db.valor_original = p.valorOriginal;
+  if (p.valorRestante !== undefined) db.valor_restante = p.valorRestante;
+  if (p.status !== undefined) db.status = p.status;
+  if (p.pagamentos !== undefined) db.pagamentos = p.pagamentos;
+  if (p.observacoes !== undefined) db.observacoes = p.observacoes;
+  return db;
+};
+
+const mapLogFromDB = (db: any): LogOperacao => ({
+  id: db.id,
+  data: db.data,
+  usuario: db.usuario,
+  acao: db.acao,
+  detalhe: db.detalhe || ''
+});
+
+const mapLogToDB = (l: Partial<LogOperacao>) => {
+  const db: any = {};
+  if (l.id !== undefined) db.id = l.id;
+  if (l.data !== undefined) db.data = l.data;
+  if (l.usuario !== undefined) db.usuario = l.usuario;
+  if (l.acao !== undefined) db.acao = l.acao;
+  if (l.detalhe !== undefined) db.detalhe = l.detalhe;
+  return db;
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   
   // --- INICIALIZAÇÃO DE ESTADOS ---
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -494,34 +721,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [logs, setLogs] = useState<LogOperacao[]>([]);
 
-  // Carregar dados no primeiro boot
+  // Carregar dados a partir do Supabase ou Fallback para o localStorage/mocks
   useEffect(() => {
-    const localGet = <T,>(key: string, initial: T): T => {
-      const val = localStorage.getItem(key);
-      return val ? JSON.parse(val) : initial;
-    };
-
-    // Se o localStorage estiver vazio de dados essenciais, inicializa com a massa fictícia
-    if (!localStorage.getItem('erp_clientes')) {
-      localStorage.setItem('erp_clientes', JSON.stringify(INITIAL_CLIENTES));
-      localStorage.setItem('erp_fornecedores', JSON.stringify(INITIAL_FORNECEDORES));
-      localStorage.setItem('erp_produtos', JSON.stringify(INITIAL_PRODUTOS));
-      localStorage.setItem('erp_movimentacoes', JSON.stringify(INITIAL_MOVIMENTACOES));
-      localStorage.setItem('erp_encomendas', JSON.stringify(INITIAL_ENCOMENDAS));
-      localStorage.setItem('erp_vendas', JSON.stringify(INITIAL_VENDAS));
-      localStorage.setItem('erp_parcelas', JSON.stringify(INITIAL_PARCELAS));
-      localStorage.setItem('erp_logs', JSON.stringify(INITIAL_LOGS));
+    if (!user) {
+      setClientes([]);
+      setFornecedores([]);
+      setProdutos([]);
+      setMovimentacoesEstoque([]);
+      setEncomendas([]);
+      setVendas([]);
+      setParcelas([]);
+      setLogs([]);
+      return;
     }
 
-    setClientes(localGet('erp_clientes', INITIAL_CLIENTES));
-    setFornecedores(localGet('erp_fornecedores', INITIAL_FORNECEDORES));
-    setProdutos(localGet('erp_produtos', INITIAL_PRODUTOS));
-    setMovimentacoesEstoque(localGet('erp_movimentacoes', INITIAL_MOVIMENTACOES));
-    setEncomendas(localGet('erp_encomendas', INITIAL_ENCOMENDAS));
-    setVendas(localGet('erp_vendas', INITIAL_VENDAS));
-    setParcelas(localGet('erp_parcelas', INITIAL_PARCELAS));
-    setLogs(localGet('erp_logs', INITIAL_LOGS));
-  }, []);
+    const carregarTudo = async () => {
+      try {
+        const [
+          resClientes,
+          resFornecedores,
+          resProdutos,
+          resMovimentacoes,
+          resEncomendas,
+          resVendas,
+          resParcelas,
+          resLogs
+        ] = await Promise.all([
+          supabase.from('clientes').select('*').order('nome'),
+          supabase.from('fornecedores').select('*').order('nome_fantasia'),
+          supabase.from('produtos').select('*').order('codigo_interno'),
+          supabase.from('movimentacoes_estoque').select('*').order('created_at', { ascending: false }),
+          supabase.from('encomendas').select('*').order('data_pedido', { ascending: false }),
+          supabase.from('vendas').select('*').order('data', { ascending: false }),
+          supabase.from('parcelas').select('*').order('data_vencimento'),
+          supabase.from('logs_operacao').select('*').order('data', { ascending: false })
+        ]);
+
+        if (resClientes.error && resClientes.error.code === '42P01') {
+          throw new Error('Banco de dados não estruturado. fallback local.');
+        }
+
+        setClientes((resClientes.data || []).map(mapClienteFromDB));
+        setFornecedores((resFornecedores.data || []).map(mapFornecedorFromDB));
+        setProdutos((resProdutos.data || []).map(mapProdutoFromDB));
+        setMovimentacoesEstoque((resMovimentacoes.data || []).map(mapMovimentacaoFromDB));
+        setEncomendas((resEncomendas.data || []).map(mapEncomendaFromDB));
+        setVendas((resVendas.data || []).map(mapVendaFromDB));
+        setParcelas((resParcelas.data || []).map(mapParcelaFromDB));
+        setLogs((resLogs.data || []).map(mapLogFromDB));
+        
+        console.log('Dados carregados com sucesso do Supabase.');
+      } catch (err) {
+        console.warn('Banco offline ou não configurado. Utilizando localStorage.', err);
+        
+        const localGet = <T,>(key: string, initial: T): T => {
+          const val = localStorage.getItem(key);
+          return val ? JSON.parse(val) : initial;
+        };
+
+        if (!localStorage.getItem('erp_clientes')) {
+          localStorage.setItem('erp_clientes', JSON.stringify(INITIAL_CLIENTES));
+          localStorage.setItem('erp_fornecedores', JSON.stringify(INITIAL_FORNECEDORES));
+          localStorage.setItem('erp_produtos', JSON.stringify(INITIAL_PRODUTOS));
+          localStorage.setItem('erp_movimentacoes', JSON.stringify(INITIAL_MOVIMENTACOES));
+          localStorage.setItem('erp_encomendas', JSON.stringify(INITIAL_ENCOMENDAS));
+          localStorage.setItem('erp_vendas', JSON.stringify(INITIAL_VENDAS));
+          localStorage.setItem('erp_parcelas', JSON.stringify(INITIAL_PARCELAS));
+          localStorage.setItem('erp_logs', JSON.stringify(INITIAL_LOGS));
+        }
+
+        setClientes(localGet('erp_clientes', INITIAL_CLIENTES));
+        setFornecedores(localGet('erp_fornecedores', INITIAL_FORNECEDORES));
+        setProdutos(localGet('erp_produtos', INITIAL_PRODUTOS));
+        setMovimentacoesEstoque(localGet('erp_movimentacoes', INITIAL_MOVIMENTACOES));
+        setEncomendas(localGet('erp_encomendas', INITIAL_ENCOMENDAS));
+        setVendas(localGet('erp_vendas', INITIAL_VENDAS));
+        setParcelas(localGet('erp_parcelas', INITIAL_PARCELAS));
+        setLogs(localGet('erp_logs', INITIAL_LOGS));
+      }
+    };
+
+    carregarTudo();
+  }, [user]);
 
   // Monitoramento e atualização automática do status das parcelas vencidas
   useEffect(() => {
@@ -545,10 +826,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (mudou) {
       setParcelas(novasParcelas);
       localStorage.setItem('erp_parcelas', JSON.stringify(novasParcelas));
+      
+      // Sincronizar atualizações no Supabase
+      if (user) {
+        const parcelasAfetadas = novasParcelas.filter((p, i) => p.status !== parcelas[i].status);
+        supabase.from('parcelas').upsert(parcelasAfetadas.map(mapParcelaToDB)).then(({ error }) => {
+          if (error) console.error('Erro ao sincronizar parcelas vencidas:', error);
+        });
+      }
     }
-  }, [parcelas]);
+  }, [parcelas, user]);
 
-  // Sincronização automática para o localStorage
+  // Sincronização auxiliar no localStorage (cache/fallback local)
   const saveAndSet = <T,>(key: string, data: T, setter: React.Dispatch<React.SetStateAction<T>>) => {
     setter(data);
     localStorage.setItem(key, JSON.stringify(data));
@@ -557,13 +846,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- LOGS DE OPERAÇÃO ---
   const registrarLog = (usuario: string, acao: string, detalhe: string) => {
     const novoLog: LogOperacao = {
-      id: generateId(),
+      id: 'LOG_' + generateId(),
       data: new Date().toISOString(),
       usuario,
       acao,
       detalhe
     };
     saveAndSet('erp_logs', [novoLog, ...logs], setLogs);
+
+    if (user) {
+      supabase.from('logs_operacao').insert(mapLogToDB(novoLog)).then(({ error }) => {
+        if (error) console.error('Erro ao registrar log no Supabase:', error);
+      });
+    }
   };
 
   // --- OPERAÇÕES CLIENTE ---
@@ -576,6 +871,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalDivida: 0
     };
     saveAndSet('erp_clientes', [...clientes, novo], setClientes);
+
+    if (user) {
+      supabase.from('clientes').insert(mapClienteToDB(novo)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar cliente no Supabase:', error);
+      });
+    }
+
     registrarLog('Usuário', 'Cadastro Cliente', `Cadastrou o cliente ${c.nome}`);
     return id;
   };
@@ -583,6 +885,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCliente = (id: string, updates: Partial<Cliente>) => {
     const novos = clientes.map(c => (c.id === id ? { ...c, ...updates } : c));
     saveAndSet('erp_clientes', novos, setClientes);
+
+    if (user) {
+      supabase.from('clientes').update(mapClienteToDB(updates)).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar cliente no Supabase:', error);
+      });
+    }
+
     const cli = clientes.find(c => c.id === id);
     registrarLog('Usuário', 'Alteração Cliente', `Alterou dados do cliente ${cli?.nome}`);
   };
@@ -590,6 +899,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteCliente = (id: string) => {
     const cli = clientes.find(c => c.id === id);
     saveAndSet('erp_clientes', clientes.filter(c => c.id !== id), setClientes);
+
+    if (user) {
+      supabase.from('clientes').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao deletar cliente no Supabase:', error);
+      });
+    }
+
     registrarLog('Usuário', 'Exclusão Cliente', `Excluiu o cliente ${cli?.nome}`);
   };
 
@@ -598,6 +914,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = 'FOR_' + generateId();
     const novo: Fornecedor = { ...f, id };
     saveAndSet('erp_fornecedores', [...fornecedores, novo], setFornecedores);
+
+    if (user) {
+      supabase.from('fornecedores').insert(mapFornecedorToDB(novo)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar fornecedor no Supabase:', error);
+      });
+    }
+
     registrarLog('Usuário', 'Cadastro Fornecedor', `Cadastrou fornecedor ${f.nomeFantasia}`);
     return id;
   };
@@ -605,6 +928,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateFornecedor = (id: string, updates: Partial<Fornecedor>) => {
     const novos = fornecedores.map(f => (f.id === id ? { ...f, ...updates } : f));
     saveAndSet('erp_fornecedores', novos, setFornecedores);
+
+    if (user) {
+      supabase.from('fornecedores').update(mapFornecedorToDB(updates)).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar fornecedor no Supabase:', error);
+      });
+    }
+
     const forn = fornecedores.find(f => f.id === id);
     registrarLog('Usuário', 'Alteração Fornecedor', `Alterou dados do fornecedor ${forn?.nomeFantasia}`);
   };
@@ -612,25 +942,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteFornecedor = (id: string) => {
     const forn = fornecedores.find(f => f.id === id);
     saveAndSet('erp_fornecedores', fornecedores.filter(f => f.id !== id), setFornecedores);
+
+    if (user) {
+      supabase.from('fornecedores').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao deletar fornecedor no Supabase:', error);
+      });
+    }
+
     registrarLog('Usuário', 'Exclusão Fornecedor', `Excluiu fornecedor ${forn?.nomeFantasia}`);
   };
 
   // --- OPERAÇÕES PRODUTO ---
   const addProduto = (p: Omit<Produto, 'id' | 'codigoInterno'>): string => {
     const id = 'PROD_' + generateId();
-    // Gerar código interno automático simples incremental
     const maxCod = produtos.reduce((max, prod) => Math.max(max, parseInt(prod.codigoInterno) || 0), 1000);
     const codigoInterno = (maxCod + 1).toString();
 
     const novo: Produto = { ...p, id, codigoInterno };
     saveAndSet('erp_produtos', [...produtos, novo], setProdutos);
 
+    if (user) {
+      supabase.from('produtos').insert(mapProdutoToDB(novo)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar produto no Supabase:', error);
+      });
+    }
+
     // Gerar movimentações de estoque iniciais para cada tamanho
     const novasMovs: MovimentacaoEstoque[] = [];
     p.tamanhos.forEach(t => {
       if (t.estoque > 0) {
-        novasMovs.push({
-          id: generateId(),
+        const novaMov: MovimentacaoEstoque = {
+          id: 'MOV_' + generateId(),
           produtoId: id,
           tamanho: t.tamanho,
           tipo: 'entrada',
@@ -639,7 +981,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           data: new Date().toISOString().split('T')[0],
           observacao: 'Carga inicial no cadastro',
           usuario: 'Usuário'
-        });
+        };
+        novasMovs.push(novaMov);
+
+        if (user) {
+          supabase.from('movimentacoes_estoque').insert(mapMovimentacaoToDB(novaMov)).then(({ error }) => {
+            if (error) console.error('Erro ao salvar movimentação inicial no Supabase:', error);
+          });
+        }
       }
     });
 
@@ -654,6 +1003,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProduto = (id: string, updates: Partial<Produto>) => {
     const novos = produtos.map(p => (p.id === id ? { ...p, ...updates } : p));
     saveAndSet('erp_produtos', novos, setProdutos);
+
+    if (user) {
+      supabase.from('produtos').update(mapProdutoToDB(updates)).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar produto no Supabase:', error);
+      });
+    }
+
     const prod = produtos.find(p => p.id === id);
     registrarLog('Usuário', 'Alteração Produto', `Alterou dados do produto ${prod?.nome}`);
   };
@@ -667,7 +1023,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...resto,
       nome: `${original.nome} (Cópia)`,
       codigoBarras: original.codigoBarras ? `${original.codigoBarras}-C` : '',
-      // Clonar estoques zerados para cópia
       tamanhos: original.tamanhos.map(t => ({ tamanho: t.tamanho, estoque: 0 }))
     };
 
@@ -677,6 +1032,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteProduto = (id: string) => {
     const prod = produtos.find(p => p.id === id);
     saveAndSet('erp_produtos', produtos.filter(p => p.id !== id), setProdutos);
+
+    if (user) {
+      supabase.from('produtos').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao deletar produto no Supabase:', error);
+      });
+    }
+
     registrarLog('Usuário', 'Exclusão Produto', `Excluiu o produto ${prod?.nome}`);
   };
 
@@ -690,7 +1052,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     obs?: string,
     usuario: string = 'Usuário'
   ) => {
-    // Atualizar estoque no produto
     const novosProdutos = produtos.map(p => {
       if (p.id !== produtoId) return p;
       const novosTamanhos = p.tamanhos.map(t => {
@@ -703,9 +1064,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     saveAndSet('erp_produtos', novosProdutos, setProdutos);
 
-    // Criar histórico
+    const prod = novosProdutos.find(p => p.id === produtoId);
+    if (user && prod) {
+      supabase.from('produtos').update({ tamanhos: prod.tamanhos }).eq('id', produtoId).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar tamanhos do produto no Supabase:', error);
+      });
+    }
+
     const novaMov: MovimentacaoEstoque = {
-      id: generateId(),
+      id: 'MOV_' + generateId(),
       produtoId,
       tamanho,
       tipo,
@@ -718,7 +1085,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     saveAndSet('erp_movimentacoes', [novaMov, ...movimentacoesEstoque], setMovimentacoesEstoque);
 
-    const prod = produtos.find(p => p.id === produtoId);
+    if (user) {
+      supabase.from('movimentacoes_estoque').insert(mapMovimentacaoToDB(novaMov)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar movimentação no Supabase:', error);
+      });
+    }
+
     registrarLog(usuario, 'Ajuste Estoque', `Ajuste manual (${tipo === 'entrada' ? '+' : '-'}${quantidade}) no produto ${prod?.nome} (Tamanho: ${tamanho})`);
   };
 
@@ -731,6 +1103,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dataPedido: new Date().toISOString().split('T')[0]
     };
     saveAndSet('erp_encomendas', [...encomendas, nova], setEncomendas);
+
+    if (user) {
+      supabase.from('encomendas').insert(mapEncomendaToDB(nova)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar encomenda no Supabase:', error);
+      });
+    }
+
     const cli = clientes.find(c => c.id === e.clienteId);
     const prod = produtos.find(p => p.id === e.produtoId);
     registrarLog('Usuário', 'Encomenda Criada', `Encomenda criada para ${cli?.nome} - Produto ${prod?.nome}`);
@@ -740,6 +1119,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateEncomendaStatus = (id: string, status: Encomenda['status']) => {
     const novas = encomendas.map(e => (e.id === id ? { ...e, status } : e));
     saveAndSet('erp_encomendas', novas, setEncomendas);
+
+    if (user) {
+      supabase.from('encomendas').update({ status }).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar status da encomenda no Supabase:', error);
+      });
+    }
+
     const enc = encomendas.find(e => e.id === id);
     const cli = clientes.find(c => c.id === enc?.clienteId);
     registrarLog('Usuário', 'Alteração Status Encomenda', `Encomenda do cliente ${cli?.nome} alterada para: ${status.replace('_', ' ')}`);
@@ -747,6 +1133,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteEncomenda = (id: string) => {
     saveAndSet('erp_encomendas', encomendas.filter(e => e.id !== id), setEncomendas);
+
+    if (user) {
+      supabase.from('encomendas').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao deletar encomenda no Supabase:', error);
+      });
+    }
+
     registrarLog('Usuário', 'Exclusão Encomenda', `Excluiu encomenda ID ${id}`);
   };
 
@@ -766,10 +1159,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       usuario
     };
 
-    // 1. Gravar Venda
     saveAndSet('erp_vendas', [novaVenda, ...vendas], setVendas);
 
-    // 2. Abater Estoque e Registrar Movimentação para cada produto vendido
+    if (user) {
+      supabase.from('vendas').insert(mapVendaToDB(novaVenda)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar venda no Supabase:', error);
+      });
+    }
+
+    // Abater Estoque e Registrar Movimentação para cada produto vendido
     const novosProdutos = [...produtos];
     const novasMovs: MovimentacaoEstoque[] = [];
 
@@ -785,9 +1183,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         novosProdutos[prodIdx] = { ...prod, tamanhos: novosTamanhos };
 
-        // Lançar movimentação
-        novasMovs.push({
-          id: generateId(),
+        const novaMov: MovimentacaoEstoque = {
+          id: 'MOV_' + generateId(),
           produtoId: item.produtoId,
           tamanho: item.tamanho,
           tipo: 'saida',
@@ -796,21 +1193,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           data: dataVenda,
           observacao: `Venda ${vendaId}`,
           usuario
-        });
+        };
+        novasMovs.push(novaMov);
+
+        if (user) {
+          supabase.from('produtos').update({ tamanhos: novosTamanhos }).eq('id', item.produtoId).then(({ error }) => {
+            if (error) console.error('Erro ao abater estoque no Supabase:', error);
+          });
+          supabase.from('movimentacoes_estoque').insert(mapMovimentacaoToDB(novaMov)).then(({ error }) => {
+            if (error) console.error('Erro ao salvar movimentação de venda no Supabase:', error);
+          });
+        }
       }
     });
 
-    saveAndSet('erp_produtos', novosProdutos, setProdutos);
-    saveAndSet('erp_movimentacoes', [...novasMovs, ...movimentacoesEstoque], setMovimentacoesEstoque);
+    setProdutos(novosProdutos);
+    localStorage.setItem('erp_produtos', JSON.stringify(novosProdutos));
 
-    // 3. Processar Crediário se aplicável
+    const novasMovimentacoes = [...novasMovs, ...movimentacoesEstoque];
+    setMovimentacoesEstoque(novasMovimentacoes);
+    localStorage.setItem('erp_movimentacoes', JSON.stringify(novasMovimentacoes));
+
+    // Processar Crediário se aplicável
     let valorFinanciadoCrediario = 0;
     const credForma = v.formasPagamento.find(f => f.tipo === 'crediario');
     
     if (credForma && credForma.valor > 0 && v.clienteId && parcelasPreviamenteGeradas) {
       valorFinanciadoCrediario = credForma.valor;
       
-      // Salvar parcelas geradas
       const novasParcelasSalvas: Parcela[] = parcelasPreviamenteGeradas.map(p => ({
         ...p,
         id: 'PARC_' + generateId(),
@@ -818,17 +1228,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
 
       saveAndSet('erp_parcelas', [...novasParcelasSalvas, ...parcelas], setParcelas);
+
+      if (user) {
+        supabase.from('parcelas').insert(novasParcelasSalvas.map(p => mapParcelaToDB(p))).then(({ error }) => {
+          if (error) console.error('Erro ao salvar parcelas no Supabase:', error);
+        });
+      }
     }
 
-    // 4. Atualizar Total Comprado e Dívida do Cliente
+    // Atualizar Total Comprado e Dívida do Cliente
     if (v.clienteId) {
       const novosClientes = clientes.map(c => {
         if (c.id === v.clienteId) {
-          return {
+          const novoCli = {
             ...c,
             totalComprado: c.totalComprado + v.total,
             totalDivida: c.totalDivida + valorFinanciadoCrediario
           };
+          
+          if (user) {
+            supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
+              if (error) console.error('Erro ao atualizar totais do cliente no Supabase:', error);
+            });
+          }
+          return novoCli;
         }
         return c;
       });
@@ -839,7 +1262,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return vendaId;
   };
 
-  // --- RECEBIMENTO PARCIAL AVANÇADO (AS 4 REGRAS) ---
+  // --- RECEBIMENTO PARCIAL AVANÇADO (COM SINCRONIZAÇÃO PONTUAL SUPABASE) ---
   const receberParcela = (
     parcelaId: string, 
     valorRecebido: number, 
@@ -855,6 +1278,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     const parcela = parcelasAtuais[idx];
     const valorOriginalRestante = parcela.valorRestante;
+    const parcelasParaSincronizar: Parcela[] = [];
 
     // Se o valor recebido for igual ou maior que o valor restante (integral ou super-pago)
     if (valorRecebido >= valorOriginalRestante) {
@@ -865,22 +1289,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tipoPagamento
       };
 
-      parcelasAtuais[idx] = {
+      const parcelaPaga = {
         ...parcela,
         valorRestante: 0,
-        status: 'paga',
+        status: 'paga' as const,
         pagamentos: [...parcela.pagamentos, novoPagamento]
       };
+      parcelasAtuais[idx] = parcelaPaga;
+      parcelasParaSincronizar.push(parcelaPaga);
 
       // Atualizar dívida do cliente (diminuindo pelo valor pago)
       const novosClientes = clientes.map(c => {
         if (c.id === parcela.clienteId) {
-          return { ...c, totalDivida: Math.max(0, c.totalDivida - pagoReal) };
+          const novoCli = { ...c, totalDivida: Math.max(0, c.totalDivida - pagoReal) };
+          if (user) {
+            supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
+              if (error) console.error('Erro ao atualizar dívida no Supabase:', error);
+            });
+          }
+          return novoCli;
         }
         return c;
       });
       saveAndSet('erp_clientes', novosClientes, setClientes);
       saveAndSet('erp_parcelas', parcelasAtuais, setParcelas);
+
+      if (user) {
+        supabase.from('parcelas').upsert(parcelasParaSincronizar.map(mapParcelaToDB)).then(({ error }) => {
+          if (error) console.error('Erro ao sincronizar parcela no Supabase:', error);
+        });
+      }
       
       const cli = clientes.find(c => c.id === parcela.clienteId);
       registrarLog(usuario, 'Recebimento Parcela', `Recebimento integral (R$ ${pagoReal.toFixed(2)}) da parcela ${parcela.numeroParcela}/${parcela.totalParcelas} do cliente ${cli?.nome}`);
@@ -896,7 +1334,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         destinoSaldo
       };
 
-      // Passo Inicial: Baixar a parcela pelo valor recebido
+      // Passo Inicial: Baixar a parcela pelo valor recebido (parcialmente paga temporariamente)
       parcelasAtuais[idx] = {
         ...parcela,
         valorRestante: saldoDevedorRestante,
@@ -906,25 +1344,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const cli = clientes.find(c => c.id === parcela.clienteId);
 
-      // APLICAR AS REGRAS DE NEGÓCIO PARA O SALDO DEVEDOR
-      
       // REGRA A: Manter saldo na mesma parcela
       if (destinoSaldo === 'manter') {
-        // Nada muda além do que já foi feito (parcela fica marcada como parcialmente paga e o valorRestante foi atualizado)
+        parcelasParaSincronizar.push(parcelasAtuais[idx]);
         registrarLog(usuario, 'Recebimento Parcial A', `Recebido R$ ${valorRecebido.toFixed(2)} da parc. ${parcela.numeroParcela}/${parcela.totalParcelas} de ${cli?.nome}. Saldo mantido na mesma parcela.`);
       } 
       
       // REGRA B: Transferir saldo para a próxima parcela
       else if (destinoSaldo === 'transferir') {
-        // A parcela atual é quitada (marcada como paga com o recebimento de hoje)
+        // A parcela atual é quitada
         parcelasAtuais[idx] = {
           ...parcela,
           valorRestante: 0,
           status: 'paga',
           pagamentos: [...parcela.pagamentos, novoPagamento]
         };
+        parcelasParaSincronizar.push(parcelasAtuais[idx]);
 
-        // Encontrar a próxima parcela em aberto do mesmo cliente
         const parcelasClienteFuturas = parcelasAtuais
           .filter(p => p.clienteId === parcela.clienteId && p.id !== parcelaId && (p.status === 'em_aberto' || p.status === 'paga_parcial' || p.status === 'vencida'))
           .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento));
@@ -933,30 +1369,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const proxParcela = parcelasClienteFuturas[0];
           const proxIdx = parcelasAtuais.findIndex(p => p.id === proxParcela.id);
           
-          parcelasAtuais[proxIdx] = {
+          const proxParcelaAtualizada = {
             ...proxParcela,
             valorOriginal: proxParcela.valorOriginal + saldoDevedorRestante,
             valorRestante: proxParcela.valorRestante + saldoDevedorRestante,
             observacoes: (proxParcela.observacoes ? proxParcela.observacoes + ' | ' : '') + `+R$ ${saldoDevedorRestante.toFixed(2)} transferidos da parc. ${parcela.numeroParcela}`
           };
+          parcelasAtuais[proxIdx] = proxParcelaAtualizada;
+          parcelasParaSincronizar.push(proxParcelaAtualizada);
+          
           registrarLog(usuario, 'Recebimento Parcial B', `Recebido R$ ${valorRecebido.toFixed(2)} (parc. ${parcela.numeroParcela}). Saldo R$ ${saldoDevedorRestante.toFixed(2)} transferido para parc. ${proxParcela.numeroParcela}.`);
         } else {
-          // Se não houver próxima parcela, age como Regra D (cria nova parcela)
           destinoSaldo = 'criar_nova';
         }
       } 
       
       // REGRA C: Diluir saldo entre parcelas futuras
       else if (destinoSaldo === 'diluir') {
-        // Quita a parcela atual
         parcelasAtuais[idx] = {
           ...parcela,
           valorRestante: 0,
           status: 'paga',
           pagamentos: [...parcela.pagamentos, novoPagamento]
         };
+        parcelasParaSincronizar.push(parcelasAtuais[idx]);
 
-        // Encontrar todas as parcelas futuras em aberto/vencidas
         const parcelasFuturas = parcelasAtuais
           .filter(p => p.clienteId === parcela.clienteId && p.id !== parcelaId && (p.status === 'em_aberto' || p.status === 'paga_parcial' || p.status === 'vencida'));
 
@@ -965,12 +1402,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           
           parcelasFuturas.forEach(pf => {
             const fIdx = parcelasAtuais.findIndex(p => p.id === pf.id);
-            parcelasAtuais[fIdx] = {
+            const pfAtualizada = {
               ...pf,
               valorOriginal: pf.valorOriginal + valorAdicionalPorParcela,
               valorRestante: pf.valorRestante + valorAdicionalPorParcela,
               observacoes: (pf.observacoes ? pf.observacoes + ' | ' : '') + `+R$ ${valorAdicionalPorParcela.toFixed(2)} diluídos da parc. ${parcela.numeroParcela}`
             };
+            parcelasAtuais[fIdx] = pfAtualizada;
+            parcelasParaSincronizar.push(pfAtualizada);
           });
           registrarLog(usuario, 'Recebimento Parcial C', `Recebido R$ ${valorRecebido.toFixed(2)} (parc. ${parcela.numeroParcela}). Saldo R$ ${saldoDevedorRestante.toFixed(2)} diluído em ${parcelasFuturas.length} parcelas futuras.`);
         } else {
@@ -980,15 +1419,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // REGRA D: Criar nova parcela com o saldo
       if (destinoSaldo === 'criar_nova') {
-        // Quita a parcela atual
         parcelasAtuais[idx] = {
           ...parcela,
           valorRestante: 0,
           status: 'paga',
           pagamentos: [...parcela.pagamentos, novoPagamento]
         };
+        parcelasParaSincronizar.push(parcelasAtuais[idx]);
 
-        // Descobrir a data de vencimento projetada (pegar a última data de vencimento das parcelas deste cliente e somar 30 dias)
         const parcelasTodasCliente = parcelasAtuais.filter(p => p.clienteId === parcela.clienteId);
         
         let ultimaDataStr = hojeStr;
@@ -998,7 +1436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         const dataRef = new Date(ultimaDataStr);
-        dataRef.setDate(dataRef.getDate() + 30); // Vencimento 30 dias após a última parcela
+        dataRef.setDate(dataRef.getDate() + 30);
         const novaDataVencimento = dataRef.toISOString().split('T')[0];
 
         const novaParcela: Parcela = {
@@ -1014,13 +1452,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           pagamentos: [],
           observacoes: `Criada devido ao saldo residual da parc. ${parcela.numeroParcela}`
         };
-
         parcelasAtuais.push(novaParcela);
+        parcelasParaSincronizar.push(novaParcela);
         
         // Atualiza o total de parcelas de todas do mesmo vendaId para bater a contagem
         const novasParcelasContagem = parcelasAtuais.map(p => {
           if (p.vendaId === parcela.vendaId) {
-            return { ...p, totalParcelas: parcelasTodasCliente.length + 1 };
+            const pac = { ...p, totalParcelas: parcelasTodasCliente.length + 1 };
+            parcelasParaSincronizar.push(pac);
+            return pac;
           }
           return p;
         });
@@ -1028,28 +1468,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveAndSet('erp_parcelas', novasParcelasContagem, setParcelas);
         registrarLog(usuario, 'Recebimento Parcial D', `Recebido R$ ${valorRecebido.toFixed(2)} (parc. ${parcela.numeroParcela}). Criada nova parcela de R$ ${saldoDevedorRestante.toFixed(2)} para ${novaDataVencimento}.`);
         
-        // Atualiza a dívida do cliente (diminui apenas pelo recebido real de hoje)
+        // Atualiza a dívida do cliente
         const novosClientes = clientes.map(c => {
           if (c.id === parcela.clienteId) {
-            return { ...c, totalDivida: Math.max(0, c.totalDivida - valorRecebido) };
+            const novoCli = { ...c, totalDivida: Math.max(0, c.totalDivida - valorRecebido) };
+            if (user) {
+              supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
+                if (error) console.error('Erro ao atualizar dívida do cliente no Supabase:', error);
+              });
+            }
+            return novoCli;
           }
           return c;
         });
         saveAndSet('erp_clientes', novosClientes, setClientes);
+
+        if (user) {
+          supabase.from('parcelas').upsert(parcelasParaSincronizar.map(mapParcelaToDB)).then(({ error }) => {
+            if (error) console.error('Erro ao sincronizar parcelas no Supabase (Regra D):', error);
+          });
+        }
         return;
       }
 
-      // Salvar parcelas (Regras A, B e C que não criaram nova parcela direta no seu escopo)
+      // Salvar parcelas (Regras A, B e C)
       saveAndSet('erp_parcelas', parcelasAtuais, setParcelas);
 
-      // Atualizar a dívida total do cliente (diminuindo pelo valor recebido hoje)
+      // Atualizar a dívida total do cliente
       const novosClientes = clientes.map(c => {
         if (c.id === parcela.clienteId) {
-          return { ...c, totalDivida: Math.max(0, c.totalDivida - valorRecebido) };
+          const novoCli = { ...c, totalDivida: Math.max(0, c.totalDivida - valorRecebido) };
+          if (user) {
+            supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
+              if (error) console.error('Erro ao atualizar dívida do cliente no Supabase:', error);
+            });
+          }
+          return novoCli;
         }
         return c;
       });
       saveAndSet('erp_clientes', novosClientes, setClientes);
+
+      if (user && parcelasParaSincronizar.length > 0) {
+        supabase.from('parcelas').upsert(parcelasParaSincronizar.map(mapParcelaToDB)).then(({ error }) => {
+          if (error) console.error('Erro ao sincronizar parcelas no Supabase:', error);
+        });
+      }
     }
   };
 
@@ -1064,6 +1528,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     usuario: string = 'Caixa'
   ) => {
     const hojeStr = new Date().toISOString().split('T')[0];
+    const parcelasAlteradasParaDB: Parcela[] = [];
     
     // 1. Quitar (Cancelar/Substituir) parcelas antigas renegociadas
     const valorOriginalDevedor = parcelas
@@ -1072,12 +1537,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const parcelasAtuais = parcelas.map(p => {
       if (parcelasIds.includes(p.id)) {
-        return {
+        const pac = {
           ...p,
           valorRestante: 0,
           status: 'paga' as const,
           observacoes: (p.observacoes ? p.observacoes + ' | ' : '') + `RENEGOCIADA em ${hojeStr}`
         };
+        parcelasAlteradasParaDB.push(pac);
+        return pac;
       }
       return p;
     });
@@ -1097,12 +1564,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dataVenc.setMonth(dataVenc.getMonth() + (i - 1));
       }
 
-      // Ajustar última parcela por dízimas centesimais
       const valorOriginal = i === numParcelas 
         ? Number((novoValorTotal - (valorCadaParcela * (numParcelas - 1))).toFixed(2)) 
         : valorCadaParcela;
 
-      novasParcelas.push({
+      const novaParcela: Parcela = {
         id: 'PARC_' + generateId(),
         vendaId: refVendaId,
         clienteId,
@@ -1114,30 +1580,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'em_aberto',
         pagamentos: [],
         observacoes: `Gerada da renegociação de ${parcelasIds.length} parcelas em ${hojeStr}`
-      });
+      };
+      novasParcelas.push(novaParcela);
+      parcelasAlteradasParaDB.push(novaParcela);
     }
 
-    // 3. Salvar tudo
     const todasParcelas = [...parcelasAtuais, ...novasParcelas];
     saveAndSet('erp_parcelas', todasParcelas, setParcelas);
 
-    // 4. Atualizar dívida do cliente: remove valor original das antigas e soma o novo valor negociado
+    if (user && parcelasAlteradasParaDB.length > 0) {
+      supabase.from('parcelas').upsert(parcelasAlteradasParaDB.map(mapParcelaToDB)).then(({ error }) => {
+        if (error) console.error('Erro ao salvar parcelas renegociadas no Supabase:', error);
+      });
+    }
+
+    // 3. Atualizar dívida do cliente
     const novosClientes = clientes.map(c => {
       if (c.id === clienteId) {
-        return {
+        const novoCli = {
           ...c,
           totalDivida: Math.max(0, c.totalDivida - valorOriginalDevedor + novoValorTotal)
         };
+        if (user) {
+          supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
+            if (error) console.error('Erro ao atualizar totais do cliente renegociado no Supabase:', error);
+          });
+        }
+        return novoCli;
       }
       return c;
     });
     saveAndSet('erp_clientes', novosClientes, setClientes);
 
     const cli = clientes.find(c => c.id === clienteId);
-    registrarLog(usuario, 'Renegociação Dívida', `Negociada dívida de ${cli?.nome}. Subtituídas ${parcelasIds.length} parcelas (R$ ${valorOriginalDevedor.toFixed(2)}) por ${numParcelas}x no total de R$ ${novoValorTotal.toFixed(2)}`);
+    registrarLog(usuario, 'Renegociação Dívida', `Negociada dívida de ${cli?.nome}. Substituídas ${parcelasIds.length} parcelas (R$ ${valorOriginalDevedor.toFixed(2)}) por ${numParcelas}x no total de R$ ${novoValorTotal.toFixed(2)}`);
   };
 
-  // --- FERRAMENTAS DO SISTEMA (BACKUP E RESTAURACAO) ---
+  // --- FERRAMENTAS DO SISTEMA ---
 
   const limparBanco = () => {
     localStorage.clear();
@@ -1149,6 +1628,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVendas([]);
     setParcelas([]);
     setLogs([]);
+    
+    if (user) {
+      Promise.all([
+        supabase.from('clientes').delete().neq('id', ''),
+        supabase.from('fornecedores').delete().neq('id', ''),
+        supabase.from('produtos').delete().neq('id', ''),
+        supabase.from('movimentacoes_estoque').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('encomendas').delete().neq('id', ''),
+        supabase.from('vendas').delete().neq('id', ''),
+        supabase.from('parcelas').delete().neq('id', ''),
+        supabase.from('logs_operacao').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      ]).catch(err => {
+        console.error('Erro ao limpar tabelas no Supabase:', err);
+      });
+    }
+
     registrarLog('Sistema', 'Banco Resetado', 'O banco de dados foi completamente resetado e limpo.');
   };
 
@@ -1183,6 +1678,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveAndSet('erp_vendas', parsed.vendas || [], setVendas);
       saveAndSet('erp_parcelas', parsed.parcelas, setParcelas);
       saveAndSet('erp_logs', parsed.logs || [], setLogs);
+
+      if (user) {
+        supabase.from('clientes').upsert(parsed.clientes.map(mapClienteToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('fornecedores').upsert((parsed.fornecedores || []).map(mapFornecedorToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('produtos').upsert(parsed.produtos.map(mapProdutoToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('movimentacoes_estoque').upsert((parsed.movimentacoesEstoque || []).map(mapMovimentacaoToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('encomendas').upsert((parsed.encomendas || []).map(mapEncomendaToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('vendas').upsert((parsed.vendas || []).map(mapVendaToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('parcelas').upsert(parsed.parcelas.map(mapParcelaToDB)).then(({ error }) => { if (error) console.error(error); });
+        supabase.from('logs_operacao').upsert((parsed.logs || []).map(mapLogToDB)).then(({ error }) => { if (error) console.error(error); });
+      }
       
       registrarLog('Administrador', 'Restauração Backup', 'Backup restaurado com sucesso e dados recarregados.');
       return true;

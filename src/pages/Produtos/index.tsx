@@ -12,11 +12,14 @@ import {
   Trash2, 
   Edit3,
   X,
-  QrCode
+  QrCode,
+  Search,
+  Camera
 } from 'lucide-react';
 import { formatCurrency, generateId } from '../../utils/formatters';
 import { Encomendas } from '../Encomendas';
 import { Etiquetas } from './Etiquetas';
+import { ScannerModal } from '../../components/Scanner/ScannerModal';
 
 export const Produtos: React.FC<{ filterText: string }> = ({ filterText }) => {
   const { 
@@ -63,6 +66,31 @@ export const Produtos: React.FC<{ filterText: string }> = ({ filterText }) => {
 
   // Scanner Simulado
   const [scanCode, setScanCode] = useState('');
+  const [busca, setBusca] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleScanSuccess = (decodedText: string) => {
+    // 1. Identificar se é QR Code estruturado do GlowPOS: glowpos:id_produto:tamanho
+    let prodId = '';
+    if (decodedText.startsWith('glowpos:')) {
+      const parts = decodedText.split(':');
+      prodId = parts[1];
+    }
+
+    // 2. Localizar o produto pelo ID detectado ou pelo código de barras/interno
+    const prod = produtos.find(p => 
+      (prodId && p.id === prodId) || 
+      p.codigoBarras === decodedText || 
+      p.codigoInterno === decodedText
+    );
+
+    if (prod) {
+      setShowScanner(false);
+      handleOpenEditProduto(prod, { stopPropagation: () => {} } as any);
+    } else {
+      alert(`Produto não localizado com a leitura: "${decodedText}"`);
+    }
+  };
 
   const clearForm = () => {
     setProdNome('');
@@ -229,7 +257,7 @@ export const Produtos: React.FC<{ filterText: string }> = ({ filterText }) => {
   };
 
   // FILTRAGEM
-  const searchNormalized = filterText.toLowerCase();
+  const searchNormalized = (busca || filterText).toLowerCase();
   const searchProdutos = produtos.filter(p => 
     p.nome.toLowerCase().includes(searchNormalized) ||
     p.codigoBarras.includes(searchNormalized) ||
@@ -300,6 +328,34 @@ export const Produtos: React.FC<{ filterText: string }> = ({ filterText }) => {
       {/* CATÁLOGO DE PRODUTOS */}
       {activeSubTab === 'lista' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* BARRA DE PESQUISA E SCANNER INTEGRADO (IGUAL AO PDV) */}
+          <div className="card glass" style={{ padding: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Busque por Nome, Código ou Bipe com leitor..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="form-input"
+                style={{ paddingLeft: '40px', borderRadius: 'var(--radius-full)' }}
+              />
+              <Search size={16} style={{ position: 'absolute', left: '16px', top: '15px', color: 'var(--text-muted)' }} />
+            </div>
+            
+            <button 
+              type="button"
+              onClick={() => {
+                setShowScanner(true);
+              }}
+              className="btn btn-primary btn-icon"
+              style={{ borderRadius: 'var(--radius-full)', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Escanear com a câmera"
+            >
+              <Camera size={18} />
+            </button>
+          </div>
+
           {searchProdutos.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
               Nenhum produto cadastrado ou encontrado
@@ -823,6 +879,13 @@ export const Produtos: React.FC<{ filterText: string }> = ({ filterText }) => {
           </div>
         </div>
       )}
+
+      {/* SCANNER VIA CÂMERA INTEGRADO */}
+      <ScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanSuccess={handleScanSuccess}
+      />
     </div>
   );
 };

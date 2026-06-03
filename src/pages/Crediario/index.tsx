@@ -198,11 +198,11 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
   return (
     <div className="crediario-container">
       {/* ABAS SECUNDÁRIAS */}
-      <div className="card glass" style={{ padding: '8px', marginBottom: '20px', display: 'flex', gap: '8px' }}>
+      <div className="card glass" style={{ padding: '8px', marginBottom: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveSubTab('parcelas')}
           className={`btn ${activeSubTab === 'parcelas' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 120px', minWidth: '120px' }}
         >
           <CreditCard size={18} />
           Controle de Parcelas
@@ -210,7 +210,7 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
         <button
           onClick={() => setActiveSubTab('renegociacao')}
           className={`btn ${activeSubTab === 'renegociacao' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 120px', minWidth: '120px' }}
           disabled={!hasAccess('finance_modify')}
         >
           <RefreshCw size={18} />
@@ -219,7 +219,7 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
         <button
           onClick={() => setActiveSubTab('inadimplencia')}
           className={`btn ${activeSubTab === 'inadimplencia' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 120px', minWidth: '120px' }}
         >
           <AlertTriangle size={18} />
           Painel Inadimplência
@@ -293,12 +293,9 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
                 return (
                   <div 
                     key={p.id} 
-                    className="card" 
+                    className="card crediario-card" 
                     style={{ 
-                      padding: '12px 16px', 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
+                      padding: '16px', 
                       borderLeft: isPaga 
                         ? '4px solid var(--color-success)' 
                         : isVencida 
@@ -309,7 +306,7 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
                     }}
                   >
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <strong style={{ fontSize: '0.95rem' }}>{cli ? cli.nome : 'Cliente Desconhecido'}</strong>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CUPOM: {p.vendaId}</span>
                       </div>
@@ -325,7 +322,7 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div className="crediario-card-actions">
                       <div style={{ textAlign: 'right' }}>
                         <span className={`badge ${isPaga ? 'badge-success' : isVencida ? 'badge-danger' : isParcial ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: '0.65rem' }}>
                           {p.status.replace('_', ' ')}
@@ -535,14 +532,11 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
                 return (
                   <div 
                     key={c.id} 
-                    className="card" 
+                    className="card crediario-card" 
                     style={{
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
                       background: 'var(--color-danger-light)',
                       border: '1px solid var(--color-danger)',
-                      padding: '12px 16px'
+                      padding: '16px'
                     }}
                   >
                     <div>
@@ -555,9 +549,9 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
                       </div>
                     </div>
 
-                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                      <div>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>VALOR TOTAL ATRAZADO</span>
+                    <div className="crediario-inadimplente-actions">
+                      <div className="crediario-inadimplente-actions-inner">
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>VALOR TOTAL ATRASADO</span>
                         <strong style={{ color: 'var(--color-danger)', fontSize: '1.1rem' }}>{formatCurrency(totalVencido)}</strong>
                       </div>
 
@@ -650,21 +644,21 @@ export const Crediario: React.FC<{ filterText: string }> = ({ filterText }) => {
                     O que deseja fazer com o saldo restante? (Escolha uma opção):
                   </span>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem' }}>
-                    <label style={{ display: 'flex', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                      <input type="radio" name="destinoSaldo" value="manter" checked={destinoSaldo === 'manter'} onChange={() => setDestinoSaldo('manter')} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.8rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                      <input type="radio" name="destinoSaldo" value="manter" checked={destinoSaldo === 'manter'} onChange={() => setDestinoSaldo('manter')} style={{ marginTop: '4px' }} />
                       <span>Opção A: Manter saldo devedor na própria parcela.</span>
                     </label>
-                    <label style={{ display: 'flex', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                      <input type="radio" name="destinoSaldo" value="transferir" checked={destinoSaldo === 'transferir'} onChange={() => setDestinoSaldo('transferir')} />
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                      <input type="radio" name="destinoSaldo" value="transferir" checked={destinoSaldo === 'transferir'} onChange={() => setDestinoSaldo('transferir')} style={{ marginTop: '4px' }} />
                       <span>Opção B: Quitar esta parcela e transferir o saldo devedor para a PROXIMA parcela em aberto.</span>
                     </label>
-                    <label style={{ display: 'flex', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                      <input type="radio" name="destinoSaldo" value="diluir" checked={destinoSaldo === 'diluir'} onChange={() => setDestinoSaldo('diluir')} />
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                      <input type="radio" name="destinoSaldo" value="diluir" checked={destinoSaldo === 'diluir'} onChange={() => setDestinoSaldo('diluir')} style={{ marginTop: '4px' }} />
                       <span>Opção C: Quitar esta parcela e diluir a diferença igualmente em todas as parcelas FUTURAS.</span>
                     </label>
-                    <label style={{ display: 'flex', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                      <input type="radio" name="destinoSaldo" value="criar_nova" checked={destinoSaldo === 'criar_nova'} onChange={() => setDestinoSaldo('criar_nova')} />
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                      <input type="radio" name="destinoSaldo" value="criar_nova" checked={destinoSaldo === 'criar_nova'} onChange={() => setDestinoSaldo('criar_nova')} style={{ marginTop: '4px' }} />
                       <span>Opção D: Quitar esta parcela e criar uma NOVA parcela adicional de crediário no final.</span>
                     </label>
                   </div>

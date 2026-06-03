@@ -376,3 +376,60 @@ a {
     max-width: 800px;
   }
 }
+
+/* --- Responsividade do Módulo de Crediário --- */
+.crediario-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.crediario-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+
+.crediario-inadimplente-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+
+.crediario-inadimplente-actions-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+@media (min-width: 640px) {
+  .crediario-card {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .crediario-card-actions {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .crediario-inadimplente-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    width: auto;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .crediario-inadimplente-actions-inner {
+    align-items: flex-end;
+    text-align: right;
+  }
+}

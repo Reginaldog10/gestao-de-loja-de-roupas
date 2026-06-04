@@ -1,41 +1,68 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { Cliente, Fornecedor } from '../../context/AppContext';
+import type { Cliente } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { 
   UserPlus, 
-  Building2, 
-  Phone, 
-  MapPin, 
   CreditCard, 
   FileText, 
   MessageSquare,
   AlertTriangle,
   Trash2,
   Edit3,
-  X
+  X,
+  Cake,
+  Gift
 } from 'lucide-react';
-import { formatCurrency, formatDate, formatCPF, formatCNPJ, formatPhone } from '../../utils/formatters';
+import { formatCurrency, formatDate, formatCPF, formatPhone } from '../../utils/formatters';
+
+// Função auxiliar para calcular quantos dias faltam para o aniversário do cliente
+const getDiasAteAniversario = (dataNascimentoStr: string): number => {
+  if (!dataNascimentoStr) return 999;
+  
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  
+  try {
+    const partes = dataNascimentoStr.split('-');
+    if (partes.length < 3) return 999;
+    const nascMes = parseInt(partes[1]) - 1;
+    const nascDia = parseInt(partes[2]);
+    
+    const anoAtual = hoje.getFullYear();
+    const dataNiverEsteAno = new Date(anoAtual, nascMes, nascDia);
+    dataNiverEsteAno.setHours(0, 0, 0, 0);
+    
+    if (dataNiverEsteAno.getTime() < hoje.getTime()) {
+      // Já passou este ano, calcula para o próximo ano
+      const dataNiverProximoAno = new Date(anoAtual + 1, nascMes, nascDia);
+      dataNiverProximoAno.setHours(0, 0, 0, 0);
+      const diffTime = dataNiverProximoAno.getTime() - hoje.getTime();
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    } else {
+      const diffTime = dataNiverEsteAno.getTime() - hoje.getTime();
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+  } catch (e) {
+    return 999;
+  }
+};
 
 export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
   const { 
     clientes, 
-    fornecedores, 
     parcelas, 
     vendas,
-    produtos,
     addCliente, 
     updateCliente, 
     deleteCliente,
-    addFornecedor, 
-    updateFornecedor, 
-    deleteFornecedor 
+    systemConfig
   } = useApp();
 
   const { hasAccess } = useAuth();
   
-  const [activeSubTab, setActiveSubTab] = useState<'clientes' | 'fornecedores'>('clientes');
-  const [showModal, setShowModal] = useState<'none' | 'cliente' | 'fornecedor' | 'dossie'>('none');
+  const [activeSubTab, setActiveSubTab] = useState<'todos' | 'aniversariantes'>('todos');
+  const [showModal, setShowModal] = useState<'none' | 'cliente' | 'dossie'>('none');
   const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -51,17 +78,7 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
   const [cliLimite, setCliLimite] = useState(1000);
   const [cliObservacoes, setCliObservacoes] = useState('');
 
-  // Form states - Fornecedor
-  const [fornRazao, setFornRazao] = useState('');
-  const [fornFantasia, setFornFantasia] = useState('');
-  const [fornCNPJ, setFornCNPJ] = useState('');
-  const [fornTelefone, setFornTelefone] = useState('');
-  const [fornWhatsapp, setFornWhatsapp] = useState('');
-  const [fornEmail, setFornEmail] = useState('');
-  const [fornEndereco, setFornEndereco] = useState('');
-  const [fornObservacoes, setFornObservacoes] = useState('');
-
-  // Reset forms
+  // Reset form
   const clearCliForm = () => {
     setCliNome('');
     setCliCPF('');
@@ -73,18 +90,6 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
     setCliCidade('');
     setCliLimite(1000);
     setCliObservacoes('');
-    setIsEditing(false);
-  };
-
-  const clearFornForm = () => {
-    setFornRazao('');
-    setFornFantasia('');
-    setFornCNPJ('');
-    setFornTelefone('');
-    setFornWhatsapp('');
-    setFornEmail('');
-    setFornEndereco('');
-    setFornObservacoes('');
     setIsEditing(false);
   };
 
@@ -149,63 +154,6 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
     }
   };
 
-  // --- ACTIONS FORNECEDOR ---
-  const handleOpenNewFornecedor = () => {
-    clearFornForm();
-    setIsEditing(false);
-    setShowModal('fornecedor');
-  };
-
-  const handleOpenEditFornecedor = (f: Fornecedor, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedPessoaId(f.id);
-    setFornRazao(f.razaoSocial);
-    setFornFantasia(f.nomeFantasia);
-    setFornCNPJ(f.cnpj);
-    setFornTelefone(f.telefone);
-    setFornWhatsapp(f.whatsapp);
-    setFornEmail(f.email);
-    setFornEndereco(f.endereco);
-    setFornObservacoes(f.observacoes || '');
-    setIsEditing(true);
-    setShowModal('fornecedor');
-  };
-
-  const handleSaveFornecedor = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fornRazao || !fornFantasia || !fornCNPJ) {
-      alert('Preencha os campos obrigatórios: Razão Social, Nome Fantasia e CNPJ');
-      return;
-    }
-
-    const payload = {
-      razaoSocial: fornRazao,
-      nomeFantasia: fornFantasia,
-      cnpj: formatCNPJ(fornCNPJ),
-      telefone: formatPhone(fornTelefone),
-      whatsapp: fornWhatsapp.replace(/\D/g, ''),
-      email: fornEmail,
-      endereco: fornEndereco,
-      observacoes: fornObservacoes
-    };
-
-    if (isEditing && selectedPessoaId) {
-      updateFornecedor(selectedPessoaId, payload);
-    } else {
-      addFornecedor(payload);
-    }
-
-    setShowModal('none');
-    clearFornForm();
-  };
-
-  const handleDeleteFornecedor = (id: string, name: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm(`Tem certeza que deseja excluir o fornecedor ${name}?`)) {
-      deleteFornecedor(id);
-    }
-  };
-
   // --- DOSSIE CLIENTE ---
   const handleOpenDossie = (id: string) => {
     setSelectedPessoaId(id);
@@ -214,17 +162,21 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
 
   // FILTRAGEM
   const searchNormalized = filterText.toLowerCase();
+  
   const searchClientes = clientes.filter(c => 
     c.nome.toLowerCase().includes(searchNormalized) ||
     c.cpf.includes(searchNormalized) ||
     c.telefone.includes(searchNormalized)
   );
 
-  const searchFornecedores = fornecedores.filter(f => 
-    f.nomeFantasia.toLowerCase().includes(searchNormalized) ||
-    f.razaoSocial.toLowerCase().includes(searchNormalized) ||
-    f.cnpj.includes(searchNormalized)
-  );
+  // Filtro de Aniversariantes da Semana (próximos 7 dias, incluindo hoje)
+  const aniversariantesSemana = clientes
+    .map(c => ({
+      cliente: c,
+      diasAteNiver: getDiasAteAniversario(c.dataNascimento)
+    }))
+    .filter(item => item.diasAteNiver <= 6 && item.cliente.nome.toLowerCase().includes(searchNormalized))
+    .sort((a, b) => a.diasAteNiver - b.diasAteNiver);
 
   // Seleção de dados específicos para dossiê
   const selectedCliente = clientes.find(c => c.id === selectedPessoaId);
@@ -252,48 +204,63 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
     window.open(`https://wa.me/55${c.whatsapp}?text=${encoded}`, '_blank');
   };
 
+  // Enviar Mensagem de Aniversário WhatsApp
+  const handleSendParabensWhatsApp = (c: Cliente, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const template = systemConfig.mensagemAniversario || "Olá {nome}, a Glow Modas deseja a você um feliz aniversário! Para comemorar, temos um presente especial para você na nossa loja. Venha nos visitar!";
+    const primeiroNome = c.nome.split(' ')[0];
+    const mensagem = template.replace(/{nome}/g, primeiroNome);
+    const encoded = encodeURIComponent(mensagem);
+    
+    window.open(`https://wa.me/55${c.whatsapp}?text=${encoded}`, '_blank');
+  };
+
   return (
-    <div className="pessoas-container">
-      {/* ABAS SECUNDÁRIAS */}
-      <div className="card glass" style={{ padding: '8px', marginBottom: '20px', display: 'flex', gap: '8px' }}>
-        <button
-          onClick={() => setActiveSubTab('clientes')}
-          className={`btn ${activeSubTab === 'clientes' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
-        >
-          <UserPlus size={18} />
-          Clientes ({clientes.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('fornecedores')}
-          className={`btn ${activeSubTab === 'fornecedores' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
-        >
-          <Building2 size={18} />
-          Fornecedores ({fornecedores.length})
-        </button>
-      </div>
-
+    <div className="pessoas-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* HEADER DA TELA */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 800 }}>
-          {activeSubTab === 'clientes' ? 'Gestão de Clientes' : 'Gestão de Fornecedores'}
-        </h1>
-        {activeSubTab === 'clientes' ? (
-          <button onClick={handleOpenNewCliente} className="btn btn-primary btn-xs">
-            <UserPlus size={16} /> Novo Cliente
-          </button>
-        ) : (
-          <button onClick={handleOpenNewFornecedor} className="btn btn-primary btn-xs">
-            <Building2 size={16} /> Novo Fornecedor
-          </button>
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+        <div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UserPlus size={24} style={{ color: 'var(--primary-color)' }} />
+            Gestão de Clientes
+          </h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Cadastre e gerencie a carteira de clientes, limites de crediário e cashback.
+          </p>
+        </div>
+        <button onClick={handleOpenNewCliente} className="btn btn-primary btn-xs">
+          <UserPlus size={16} /> Novo Cliente
+        </button>
       </div>
 
-      {/* LISTA CLIENTES */}
-      {activeSubTab === 'clientes' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {searchClientes.length === 0 ? (
+      {/* SELETOR DE ABAS */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '10px', 
+        borderBottom: '1px solid var(--border-color)', 
+        paddingBottom: '8px',
+        marginBottom: '5px'
+      }}>
+        <button 
+          onClick={() => setActiveSubTab('todos')} 
+          className={`btn ${activeSubTab === 'todos' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          Todos os Clientes ({searchClientes.length})
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('aniversariantes')} 
+          className={`btn ${activeSubTab === 'aniversariantes' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Cake size={16} /> Aniversariantes da Semana ({aniversariantesSemana.length})
+        </button>
+      </div>
+
+      {/* RENDERIZADOR DAS LISTAS */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {activeSubTab === 'todos' ? (
+          searchClientes.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
               Nenhum cliente encontrado
             </div>
@@ -322,7 +289,7 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                     <div>
                       <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{c.nome}</h3>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        CPF: {c.cpf} | Tel: {c.telefone}
+                        CPF: {c.cpf} | Tel: {c.telefone} {c.dataNascimento && `| Nasc: ${formatDate(c.dataNascimento)}`}
                       </p>
                     </div>
 
@@ -348,7 +315,7 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'var(--bg-primary)', padding: '10px', borderRadius: 'var(--radius-xs)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', background: 'var(--bg-primary)', padding: '10px', borderRadius: 'var(--radius-xs)' }}>
                     <div>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>LIMITE DE CRÉDITO</span>
                       <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatCurrency(c.limiteCredito)}</strong>
@@ -357,6 +324,12 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>DÍVIDA EM ABERTO</span>
                       <strong style={{ fontSize: '0.9rem', color: cliDivida > 0 ? 'var(--color-warning)' : 'var(--text-muted)' }}>
                         {formatCurrency(cliDivida)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>SALDO CASHBACK</span>
+                      <strong style={{ fontSize: '0.9rem', color: (c.cashbackSaldo || 0) > 0 ? 'var(--color-success)' : 'var(--text-muted)' }}>
+                        {formatCurrency(c.cashbackSaldo || 0)}
                       </strong>
                     </div>
                   </div>
@@ -379,70 +352,115 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                 </div>
               );
             })
-          )}
-        </div>
-      )}
-
-      {/* LISTA FORNECEDORES */}
-      {activeSubTab === 'fornecedores' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {searchFornecedores.length === 0 ? (
+          )
+        ) : (
+          aniversariantesSemana.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-              Nenhum fornecedor encontrado
+              Nenhum aniversariante nesta semana
             </div>
           ) : (
-            searchFornecedores.map(f => {
-              const fornecidoCount = produtos.filter(p => p.fornecedorId === f.id).length;
+            aniversariantesSemana.map(({ cliente: c, diasAteNiver }) => {
+              const eHoje = diasAteNiver === 0;
+              const eAmanha = diasAteNiver === 1;
 
               return (
-                <div key={f.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div 
+                  key={c.id} 
+                  className="card card-interactive"
+                  onClick={() => handleOpenDossie(c.id)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderLeft: eHoje ? '4px solid #a855f7' : '1px solid var(--border-color)',
+                    background: eHoje 
+                      ? 'linear-gradient(135deg, var(--card-bg) 70%, rgba(168, 85, 247, 0.08) 100%)' 
+                      : 'var(--card-bg)'
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{f.nomeFantasia}</h3>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{f.razaoSocial}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{c.nome}</h3>
+                        {eHoje ? (
+                          <span style={{ 
+                            background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', 
+                            color: 'white', 
+                            padding: '2px 8px', 
+                            borderRadius: '20px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 700,
+                            boxShadow: '0 2px 8px rgba(168, 85, 247, 0.3)'
+                          }}>
+                            É HOJE! 🎉
+                          </span>
+                        ) : eAmanha ? (
+                          <span style={{ 
+                            background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)', 
+                            color: 'white', 
+                            padding: '2px 8px', 
+                            borderRadius: '20px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 700 
+                          }}>
+                            Amanhã! 🎂
+                          </span>
+                        ) : (
+                          <span style={{ 
+                            background: 'var(--bg-secondary)', 
+                            color: 'var(--text-secondary)', 
+                            padding: '2px 8px', 
+                            borderRadius: '20px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 600 
+                          }}>
+                            Em {diasAteNiver} dias
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Nascimento: {formatDate(c.dataNascimento)} | WhatsApp: {formatPhone(c.whatsapp)}
+                      </p>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        onClick={(e) => handleOpenEditFornecedor(f, e)} 
-                        className="btn btn-secondary btn-icon" 
-                        style={{ padding: '6px' }}
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      {hasAccess('settings_view') && (
-                        <button 
-                          onClick={(e) => handleDeleteFornecedor(f.id, f.nomeFantasia, e)} 
-                          className="btn btn-danger btn-icon" 
-                          style={{ padding: '6px' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={(e) => handleSendParabensWhatsApp(c, e)}
+                      className="btn btn-success btn-xs"
+                      style={{ 
+                        background: '#25D366', 
+                        color: 'white', 
+                        padding: '6px 12px', 
+                        fontSize: '0.8rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontWeight: 700,
+                        border: 'none',
+                        boxShadow: '0 2px 6px rgba(37, 211, 102, 0.2)'
+                      }}
+                    >
+                      <Gift size={14} /> Dar Parabéns
+                    </button>
                   </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FileText size={14} /> CNPJ: {f.cnpj}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'var(--bg-primary)', padding: '10px', borderRadius: 'var(--radius-xs)' }}>
+                    <div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>SALDO DE CASHBACK</span>
+                      <strong style={{ fontSize: '0.95rem', color: 'var(--color-success)' }}>{formatCurrency(c.cashbackSaldo || 0)}</strong>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Phone size={14} /> Tel: {f.telefone}
+                    <div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>TELEFONE CONTATO</span>
+                      <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{c.telefone}</strong>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MapPin size={14} /> {f.endereco}
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'var(--bg-primary)', padding: '6px 12px', borderRadius: 'var(--radius-xs)', alignSelf: 'flex-start', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Produtos Fornecidos no Sistema: <span style={{ color: 'var(--primary-color)' }}>{fornecidoCount}</span>
                   </div>
                 </div>
               );
             })
-          )}
-        </div>
-      )}
+          )
+        )}
+      </div>
 
       {/* MODAL CADASTRO/EDIÇÃO CLIENTE */}
       {showModal === 'cliente' && (
@@ -581,121 +599,6 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
         </div>
       )}
 
-      {/* MODAL CADASTRO/EDIÇÃO FORNECEDOR */}
-      {showModal === 'fornecedor' && (
-        <div className="modal-overlay" onClick={() => setShowModal('none')}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                {isEditing ? 'Editar Fornecedor' : 'Novo Fornecedor'}
-              </h2>
-              <button onClick={() => setShowModal('none')} className="btn-secondary btn-icon" style={{ borderRadius: '50%' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveFornecedor} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">Razão Social *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Razão Social da empresa"
-                  value={fornRazao}
-                  onChange={(e) => setFornRazao(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Nome Fantasia *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nome comercial"
-                  value={fornFantasia}
-                  onChange={(e) => setFornFantasia(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">CNPJ *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="00.000.000/0001-00"
-                    value={fornCNPJ}
-                    onChange={(e) => setFornCNPJ(formatCNPJ(e.target.value))}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">E-mail Comercial</label>
-                  <input
-                    type="email"
-                    placeholder="vendas@fornecedor.com"
-                    value={fornEmail}
-                    onChange={(e) => setFornEmail(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Telefone</label>
-                  <input
-                    type="text"
-                    placeholder="(00) 0000-0000"
-                    value={fornTelefone}
-                    onChange={(e) => setFornTelefone(formatPhone(e.target.value))}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">WhatsApp Comercial</label>
-                  <input
-                    type="text"
-                    placeholder="11900000000"
-                    value={fornWhatsapp}
-                    onChange={(e) => setFornWhatsapp(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Endereço Comercial</label>
-                <input
-                  type="text"
-                  placeholder="Rua, número, galpão, cidade, estado"
-                  value={fornEndereco}
-                  onChange={(e) => setFornEndereco(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Observações</label>
-                <textarea
-                  placeholder="Produtos principais fornecidos, prazos de entrega, chaves pix, etc."
-                  value={fornObservacoes}
-                  onChange={(e) => setFornObservacoes(e.target.value)}
-                  className="form-input"
-                  style={{ minHeight: '80px', resize: 'vertical' }}
-                />
-              </div>
-
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '10px' }}>
-                Salvar Fornecedor
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* MODAL / GAVETA: DOSSIÊ DO CLIENTE COMPLETO */}
       {showModal === 'dossie' && selectedCliente && (
         <div className="modal-overlay" onClick={() => setShowModal('none')}>
@@ -705,7 +608,7 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                 <span className="badge badge-info" style={{ marginBottom: '6px' }}>Dossiê Financeiro</span>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{selectedCliente.nome}</h2>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  CPF: {selectedCliente.cpf} | WhatsApp: {formatPhone(selectedCliente.whatsapp || '')}
+                  CPF: {selectedCliente.cpf} | WhatsApp: {formatPhone(selectedCliente.whatsapp || '')} {selectedCliente.dataNascimento && `| Nasc: ${formatDate(selectedCliente.dataNascimento)}`}
                 </p>
               </div>
               <button onClick={() => setShowModal('none')} className="btn-secondary btn-icon" style={{ borderRadius: '50%' }}>
@@ -714,7 +617,7 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
             </div>
 
             {/* DADOS CADASTRAIS RÁPIDOS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '24px' }}>
               <div className="card" style={{ padding: '12px', background: 'var(--bg-primary)' }}>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700 }}>LIMITE UTILIZADO</span>
                 <strong style={{ fontSize: '1.1rem', color: totalDividaReal > selectedCliente.limiteCredito ? 'var(--color-danger)' : 'var(--text-primary)' }}>
@@ -730,6 +633,10 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                 <strong style={{ fontSize: '1.1rem', color: parcelasVencidas.length > 0 ? 'var(--color-danger)' : 'var(--text-muted)' }}>
                   {parcelasVencidas.length}
                 </strong>
+              </div>
+              <div className="card" style={{ padding: '12px', background: 'var(--bg-primary)' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700 }}>SALDO CASHBACK</span>
+                <strong style={{ fontSize: '1.1rem', color: 'var(--color-success)' }}>{formatCurrency(selectedCliente.cashbackSaldo || 0)}</strong>
               </div>
             </div>
 

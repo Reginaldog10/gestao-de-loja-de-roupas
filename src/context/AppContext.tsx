@@ -20,6 +20,7 @@ export interface Cliente {
   foto?: string;
   totalComprado: number;
   totalDivida: number;
+  cashbackSaldo: number;
 }
 
 export interface Fornecedor {
@@ -134,6 +135,14 @@ export interface LogOperacao {
   detalhe: string;
 }
 
+export interface SystemConfig {
+  cashbackAtivo: boolean;
+  cashbackPercentual: number;
+  cashbackMinimoResgate: number;
+  cashbackValidadeDias: number;
+  mensagemAniversario: string;
+}
+
 // --- CONTEXTO & ESTADO GLOBAL ---
 
 interface AppContextType {
@@ -145,9 +154,11 @@ interface AppContextType {
   vendas: Venda[];
   parcelas: Parcela[];
   logs: LogOperacao[];
+  systemConfig: SystemConfig;
+  updateSystemConfig: (updates: Partial<SystemConfig>) => void;
   
   // Operações
-  addCliente: (cliente: Omit<Cliente, 'id' | 'totalComprado' | 'totalDivida'>) => string;
+  addCliente: (cliente: Omit<Cliente, 'id' | 'totalComprado' | 'totalDivida' | 'cashbackSaldo'>) => string;
   updateCliente: (id: string, updates: Partial<Cliente>) => void;
   deleteCliente: (id: string) => void;
   
@@ -166,7 +177,7 @@ interface AppContextType {
   updateEncomendaStatus: (id: string, status: Encomenda['status']) => void;
   deleteEncomenda: (id: string) => void;
   
-  registrarVenda: (venda: Omit<Venda, 'id' | 'data'>, parcelasPreviamenteGeradas?: Omit<Parcela, 'id' | 'vendaId'>[], usuario?: string) => string;
+  registrarVenda: (venda: Omit<Venda, 'id' | 'data'>, parcelasPreviamenteGeradas?: Omit<Parcela, 'id' | 'vendaId'>[], usuario?: string, cashbackResgatado?: number) => string;
   
   receberParcela: (
     parcelaId: string, 
@@ -218,7 +229,8 @@ const INITIAL_CLIENTES: Cliente[] = [
     limiteCredito: 1500,
     observacoes: 'Excelente cliente. Prefere tons escuros.',
     totalComprado: 950.00,
-    totalDivida: 320.00
+    totalDivida: 320.00,
+    cashbackSaldo: 0.00
   },
   {
     id: 'CLI2',
@@ -232,7 +244,8 @@ const INITIAL_CLIENTES: Cliente[] = [
     limiteCredito: 800,
     observacoes: 'Cliente inadimplente frequente. Cobrar com cuidado.',
     totalComprado: 450.00,
-    totalDivida: 280.00
+    totalDivida: 280.00,
+    cashbackSaldo: 0.00
   },
   {
     id: 'CLI3',
@@ -246,7 +259,8 @@ const INITIAL_CLIENTES: Cliente[] = [
     limiteCredito: 2000,
     observacoes: 'Compra muito para as filhas.',
     totalComprado: 1200.00,
-    totalDivida: 0
+    totalDivida: 0,
+    cashbackSaldo: 0.00
   }
 ];
 
@@ -498,7 +512,8 @@ const mapClienteFromDB = (db: any): Cliente => ({
   observacoes: db.observacoes || '',
   foto: db.foto || '',
   totalComprado: Number(db.total_comprado) || 0,
-  totalDivida: Number(db.total_divida) || 0
+  totalDivida: Number(db.total_divida) || 0,
+  cashbackSaldo: Number(db.cashback_saldo) || 0
 });
 
 const mapClienteToDB = (c: Partial<Cliente>) => {
@@ -517,6 +532,7 @@ const mapClienteToDB = (c: Partial<Cliente>) => {
   if (c.foto !== undefined) db.foto = c.foto;
   if (c.totalComprado !== undefined) db.total_comprado = c.totalComprado;
   if (c.totalDivida !== undefined) db.total_divida = c.totalDivida;
+  if (c.cashbackSaldo !== undefined) db.cashback_saldo = c.cashbackSaldo;
   return db;
 };
 
@@ -721,6 +737,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [logs, setLogs] = useState<LogOperacao[]>([]);
 
+  const [systemConfig, setSystemConfig] = useState<SystemConfig>(() => {
+    const saved = localStorage.getItem('erp_system_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return {
+      cashbackAtivo: false,
+      cashbackPercentual: 5,
+      cashbackMinimoResgate: 10,
+      cashbackValidadeDias: 0,
+      mensagemAniversario: "Olá {nome}, a Glow Modas deseja a você um feliz aniversário! Para comemorar, temos um presente especial para você na nossa loja. Venha nos visitar!"
+    };
+  });
+
+  const updateSystemConfig = (updates: Partial<SystemConfig>) => {
+    setSystemConfig(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem('erp_system_config', JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Carregar dados a partir do Supabase ou Fallback para o localStorage/mocks
   useEffect(() => {
     if (!user) {
@@ -862,13 +904,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- OPERAÇÕES CLIENTE ---
-  const addCliente = (c: Omit<Cliente, 'id' | 'totalComprado' | 'totalDivida'>): string => {
+  const addCliente = (c: Omit<Cliente, 'id' | 'totalComprado' | 'totalDivida' | 'cashbackSaldo'>): string => {
     const id = 'CLI_' + generateId();
     const novo: Cliente = {
       ...c,
       id,
       totalComprado: 0,
-      totalDivida: 0
+      totalDivida: 0,
+      cashbackSaldo: 0
     };
     saveAndSet('erp_clientes', [...clientes, novo], setClientes);
 
@@ -1147,7 +1190,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const registrarVenda = (
     v: Omit<Venda, 'id' | 'data'>, 
     parcelasPreviamenteGeradas?: Omit<Parcela, 'id' | 'vendaId'>[],
-    usuario: string = 'Vendedor'
+    usuario: string = 'Vendedor',
+    cashbackResgatado: number = 0
   ): string => {
     const vendaId = 'VEN_' + generateId();
     const dataVenda = new Date().toISOString().split('T')[0];
@@ -1236,19 +1280,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Atualizar Total Comprado e Dívida do Cliente
+    // Atualizar Total Comprado, Dívida e Saldo de Cashback do Cliente
     if (v.clienteId) {
+      const valorInstantaneo = v.formasPagamento
+        .filter(f => f.tipo !== 'crediario')
+        .reduce((sum, f) => sum + f.valor, 0);
+
+      const cashbackGanho = systemConfig.cashbackAtivo
+        ? Number((valorInstantaneo * (systemConfig.cashbackPercentual / 100)).toFixed(2))
+        : 0;
+
       const novosClientes = clientes.map(c => {
         if (c.id === v.clienteId) {
           const novoCli = {
             ...c,
             totalComprado: c.totalComprado + v.total,
-            totalDivida: c.totalDivida + valorFinanciadoCrediario
+            totalDivida: c.totalDivida + valorFinanciadoCrediario,
+            cashbackSaldo: Math.max(0, Number((c.cashbackSaldo + cashbackGanho - cashbackResgatado).toFixed(2)))
           };
           
           if (user) {
             supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
-              if (error) console.error('Erro ao atualizar totais do cliente no Supabase:', error);
+              if (error) console.error('Erro ao atualizar totais e cashback do cliente no Supabase:', error);
             });
           }
           return novoCli;
@@ -1283,6 +1336,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Se o valor recebido for igual ou maior que o valor restante (integral ou super-pago)
     if (valorRecebido >= valorOriginalRestante) {
       const pagoReal = valorOriginalRestante;
+      const cashbackGanhoParcelaIntegral = systemConfig.cashbackAtivo
+        ? Number((pagoReal * (systemConfig.cashbackPercentual / 100)).toFixed(2))
+        : 0;
+
       const novoPagamento: PagamentoParcela = {
         data: hojeStr,
         valorRecebido: pagoReal,
@@ -1298,10 +1355,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       parcelasAtuais[idx] = parcelaPaga;
       parcelasParaSincronizar.push(parcelaPaga);
 
-      // Atualizar dívida do cliente (diminuindo pelo valor pago)
+      // Atualizar dívida do cliente (diminuindo pelo valor pago) e somar cashback ganho
       const novosClientes = clientes.map(c => {
         if (c.id === parcela.clienteId) {
-          const novoCli = { ...c, totalDivida: Math.max(0, c.totalDivida - pagoReal) };
+          const novoCli = { 
+            ...c, 
+            totalDivida: Math.max(0, c.totalDivida - pagoReal),
+            cashbackSaldo: Number((c.cashbackSaldo + cashbackGanhoParcelaIntegral).toFixed(2))
+          };
           if (user) {
             supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
               if (error) console.error('Erro ao atualizar dívida no Supabase:', error);
@@ -1326,6 +1387,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // --- RECEBIMENTO PARCIAL ---
     else {
       const saldoDevedorRestante = valorOriginalRestante - valorRecebido;
+      const cashbackGanhoParcelaParcial = systemConfig.cashbackAtivo
+        ? Number((valorRecebido * (systemConfig.cashbackPercentual / 100)).toFixed(2))
+        : 0;
       
       const novoPagamento: PagamentoParcela = {
         data: hojeStr,
@@ -1468,10 +1532,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveAndSet('erp_parcelas', novasParcelasContagem, setParcelas);
         registrarLog(usuario, 'Recebimento Parcial D', `Recebido R$ ${valorRecebido.toFixed(2)} (parc. ${parcela.numeroParcela}). Criada nova parcela de R$ ${saldoDevedorRestante.toFixed(2)} para ${novaDataVencimento}.`);
         
-        // Atualiza a dívida do cliente
+        // Atualiza a dívida do cliente e somar cashback
         const novosClientes = clientes.map(c => {
           if (c.id === parcela.clienteId) {
-            const novoCli = { ...c, totalDivida: Math.max(0, c.totalDivida - valorRecebido) };
+            const novoCli = { 
+              ...c, 
+              totalDivida: Math.max(0, c.totalDivida - valorRecebido),
+              cashbackSaldo: Number((c.cashbackSaldo + cashbackGanhoParcelaParcial).toFixed(2))
+            };
             if (user) {
               supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
                 if (error) console.error('Erro ao atualizar dívida do cliente no Supabase:', error);
@@ -1494,10 +1562,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Salvar parcelas (Regras A, B e C)
       saveAndSet('erp_parcelas', parcelasAtuais, setParcelas);
 
-      // Atualizar a dívida total do cliente
+      // Atualizar a dívida total do cliente e somar cashback
       const novosClientes = clientes.map(c => {
         if (c.id === parcela.clienteId) {
-          const novoCli = { ...c, totalDivida: Math.max(0, c.totalDivida - valorRecebido) };
+          const novoCli = { 
+            ...c, 
+            totalDivida: Math.max(0, c.totalDivida - valorRecebido),
+            cashbackSaldo: Number((c.cashbackSaldo + cashbackGanhoParcelaParcial).toFixed(2))
+          };
           if (user) {
             supabase.from('clientes').update(mapClienteToDB(novoCli)).eq('id', c.id).then(({ error }) => {
               if (error) console.error('Erro ao atualizar dívida do cliente no Supabase:', error);
@@ -1701,6 +1773,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       clientes, fornecedores, produtos, movimentacoesEstoque, encomendas, vendas, parcelas, logs,
+      systemConfig, updateSystemConfig,
       addCliente, updateCliente, deleteCliente,
       addFornecedor, updateFornecedor, deleteFornecedor,
       addProduto, updateProduto, duplicateProduto, deleteProduto,

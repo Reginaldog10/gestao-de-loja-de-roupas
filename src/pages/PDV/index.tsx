@@ -31,7 +31,8 @@ export const PDV: React.FC = () => {
     produtos, 
     clientes, 
     addCliente, 
-    registrarVenda 
+    registrarVenda,
+    systemConfig
   } = useApp();
 
   const { currentProfile } = useAuth();
@@ -73,6 +74,9 @@ export const PDV: React.FC = () => {
   // Grade de parcelas geradas para edição manual
   const [parcelasGeradas, setParcelasGeradas] = useState<Omit<Parcela, 'id' | 'vendaId'>[]>([]);
 
+  // Estados de Cashback (Hook do React deve ficar no topo)
+  const [resgatarCashback, setResgatarCashback] = useState(false);
+
   // Cadastro rápido de cliente in-loco
   const [newCliNome, setNewCliNome] = useState('');
   const [newCliCPF, setNewCliCPF] = useState('');
@@ -90,6 +94,25 @@ export const PDV: React.FC = () => {
   const clienteSelecionado = clientes.find(c => c.id === selectedClienteId);
   const limiteDisponivel = clienteSelecionado ? (clienteSelecionado.limiteCredito - clienteSelecionado.totalDivida) : 0;
   const limiteEstourado = valorCrediario > limiteDisponivel;
+
+  // Lógica derivada de Cashback (deve ficar após a definição de clienteSelecionado e total)
+  const valorCashbackResgate = resgatarCashback && clienteSelecionado
+    ? Math.min(clienteSelecionado.cashbackSaldo, total)
+    : 0;
+
+  const handleToggleResgateCashback = (checked: boolean) => {
+    setResgatarCashback(checked);
+    const resgate = checked && clienteSelecionado ? Math.min(clienteSelecionado.cashbackSaldo, total) : 0;
+    const novoTotal = Math.max(0, total - resgate);
+    
+    // Se a única forma com valor for dinheiro (ou se tudo for 0), ajusta o dinheiro automaticamente
+    const formasAtivas = pagamentos.filter(p => p.valor > 0);
+    if (formasAtivas.length <= 1 && (formasAtivas.length === 0 || formasAtivas[0].tipo === 'dinheiro')) {
+      setPagamentos(pagamentos.map(p => 
+        p.tipo === 'dinheiro' ? { ...p, valor: novoTotal } : p
+      ));
+    }
+  };
 
   // --- BUSCA E FILTRO DE PRODUTOS ---
   const searchNormalized = busca.toLowerCase();
@@ -211,6 +234,7 @@ export const PDV: React.FC = () => {
       alert('O carrinho está vazio!');
       return;
     }
+    setResgatarCashback(false);
     // Inicializa valores de pagamentos: lança todo o valor no 'dinheiro' por padrão
     const novosPagamentos = pagamentos.map(p => 
       p.tipo === 'dinheiro' ? { ...p, valor: total } : { ...p, valor: 0 }
@@ -282,9 +306,11 @@ export const PDV: React.FC = () => {
 
   // --- FINALIZAR VENDA COMPLETA ---
   const handleFinalizarVenda = () => {
-    // 1. Validar se o total pago bate com o total da compra
-    if (Math.abs(totalPagoDigitado - total) > 0.02) {
-      alert(`Erro: O total das formas de pagamento (${formatCurrency(totalPagoDigitado)}) difere do total da compra (${formatCurrency(total)})`);
+    const totalFinal = Math.max(0, total - valorCashbackResgate);
+    
+    // 1. Validar se o total pago bate com o total líquido da compra
+    if (Math.abs(totalPagoDigitado - totalFinal) > 0.02) {
+      alert(`Erro: O total das formas de pagamento (${formatCurrency(totalPagoDigitado)}) difere do total líquido da compra (${formatCurrency(totalFinal)})`);
       return;
     }
 
@@ -322,19 +348,21 @@ export const PDV: React.FC = () => {
       {
         clienteId: selectedClienteId || undefined,
         subtotal,
-        desconto,
-        total,
+        desconto: desconto + valorCashbackResgate,
+        total: totalFinal,
         formasPagamento: formasAtivas,
         produtos: produtosVenda,
         usuario: currentProfile
       },
       valorCrediario > 0 ? parcelasGeradas : undefined,
-      currentProfile === 'administrador' ? 'Administrador' : currentProfile === 'caixa' ? 'Caixa' : 'Vendedor'
+      currentProfile === 'administrador' ? 'Administrador' : currentProfile === 'caixa' ? 'Caixa' : 'Vendedor',
+      valorCashbackResgate
     );
 
     // 5. Limpar estado e exibir comprovante
     setCarrinho([]);
     setDesconto(0);
+    setResgatarCashback(false);
     setShowCheckout(false);
     setShowComprovante(vendaId);
   };
@@ -642,11 +670,71 @@ export const PDV: React.FC = () => {
       {showCheckout && (
         <div className="modal-overlay" onClick={() => setShowCheckout(false)}>
           <div className="modal-content modal-content-lg" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: '30px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Fechamento Financeiro</h2>
               <button onClick={() => setShowCheckout(false)} className="btn-secondary btn-icon" style={{ borderRadius: '50%' }}>
                 <X size={20} />
               </button>
+            </div>
+
+            {/* SELETOR E IDENTIFICAÇÃO DO CLIENTE */}
+            <div className="card" style={{ padding: '16px', marginBottom: '20px', background: 'var(--bg-primary)' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Identificar Cliente para a Venda {valorCrediario > 0 ? '*' : '(Opcional)'}</label>
+                  <button type="button" onClick={() => setShowNewClienteModal(true)} className="btn btn-secondary btn-xs" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+                    <UserPlus size={12} /> + Novo Cliente Rápido
+                  </button>
+                </div>
+                <select
+                  value={selectedClienteId}
+                  onChange={(e) => {
+                    setSelectedClienteId(e.target.value);
+                    setResgatarCashback(false); // Reset resgate ao mudar de cliente
+                  }}
+                  className="form-input form-select"
+                  style={{ width: '100%' }}
+                >
+                  <option value="">Consumidor Geral (Não Identificado)</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome} ({c.cpf})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Informações de Cashback do Cliente Selecionado */}
+              {clienteSelecionado && (
+                <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px dashed var(--border-color)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Saldo de Cashback: </span>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--color-success)' }}>{formatCurrency(clienteSelecionado.cashbackSaldo || 0)}</strong>
+                  </div>
+
+                  {systemConfig.cashbackAtivo && (clienteSelecionado.cashbackSaldo || 0) > 0 && (
+                    <div>
+                      {(clienteSelecionado.cashbackSaldo || 0) < systemConfig.cashbackMinimoResgate ? (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertTriangle size={12} className="text-warning" />
+                          Mínimo para resgate: {formatCurrency(systemConfig.cashbackMinimoResgate)}
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            type="checkbox"
+                            id="usarCashbackCheckbox"
+                            checked={resgatarCashback}
+                            onChange={(e) => handleToggleResgateCashback(e.target.checked)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+                          <label htmlFor="usarCashbackCheckbox" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-success)', cursor: 'pointer', userSelect: 'none' }}>
+                            Usar Cashback como Desconto (- {formatCurrency(Math.min(clienteSelecionado.cashbackSaldo, total))})
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
@@ -680,16 +768,26 @@ export const PDV: React.FC = () => {
                     <span>Total a Receber:</span>
                     <strong>{formatCurrency(total)}</strong>
                   </div>
+                  {resgatarCashback && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--color-success)' }}>
+                      <span>Desconto Cashback:</span>
+                      <strong>- {formatCurrency(valorCashbackResgate)}</strong>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>Total Líquido:</span>
+                    <strong>{formatCurrency(total - valorCashbackResgate)}</strong>
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span>Valor Informado:</span>
-                    <strong style={{ color: Math.abs(totalPagoDigitado - total) < 0.02 ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                    <strong style={{ color: Math.abs(totalPagoDigitado - (total - valorCashbackResgate)) < 0.02 ? 'var(--color-success)' : 'var(--color-warning)' }}>
                       {formatCurrency(totalPagoDigitado)}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px dashed var(--border-color)', paddingTop: '6px', marginTop: '2px' }}>
                     <span>Diferença / Saldo:</span>
-                    <strong style={{ color: total - totalPagoDigitado === 0 ? 'var(--text-muted)' : 'var(--color-danger)' }}>
-                      {formatCurrency(total - totalPagoDigitado)}
+                    <strong style={{ color: (total - valorCashbackResgate) - totalPagoDigitado === 0 ? 'var(--text-muted)' : 'var(--color-danger)' }}>
+                      {formatCurrency((total - valorCashbackResgate) - totalPagoDigitado)}
                     </strong>
                   </div>
                 </div>
@@ -702,25 +800,6 @@ export const PDV: React.FC = () => {
                     <CreditCard size={18} />
                     Módulo de Parcelamento de Crediário
                   </h3>
-
-                  <div className="form-group" style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label className="form-label">Selecionar Cliente *</label>
-                      <button type="button" onClick={() => setShowNewClienteModal(true)} className="btn btn-secondary btn-xs" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
-                        <UserPlus size={10} /> + Cadastrar Rápido
-                      </button>
-                    </div>
-                    <select
-                      value={selectedClienteId}
-                      onChange={(e) => setSelectedClienteId(e.target.value)}
-                      className="form-input form-select"
-                    >
-                      <option value="">Selecione o Cliente do Crediário</option>
-                      {clientes.map(c => (
-                        <option key={c.id} value={c.id}>{c.nome} ({c.cpf})</option>
-                      ))}
-                    </select>
-                  </div>
 
                   {/* INFO DE LIMITE DO CLIENTE */}
                   {selectedClienteId && (
@@ -835,7 +914,7 @@ export const PDV: React.FC = () => {
                 className="btn btn-success"
                 style={{ padding: '12px 28px', fontSize: '1rem', fontWeight: 700 }}
                 disabled={
-                  Math.abs(totalPagoDigitado - total) > 0.02 || 
+                  Math.abs(totalPagoDigitado - (total - valorCashbackResgate)) > 0.02 || 
                   (valorCrediario > 0 && (!selectedClienteId || Math.abs(parcelasGeradas.reduce((sum, p) => sum + p.valorOriginal, 0) - valorCrediario) > 0.02))
                 }
               >

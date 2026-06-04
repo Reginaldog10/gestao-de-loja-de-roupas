@@ -8,7 +8,8 @@ import {
   Package, 
   Users, 
   ArrowUpRight, 
-  Sparkles
+  Sparkles,
+  Cake
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -46,6 +47,25 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
     const vencidas = parcelas.filter(p => p.clienteId === c.id && p.status === 'vencida');
     return vencidas.length > 0;
   }).length;
+
+  // 3.5. Clientes que fazem aniversário hoje
+  const aniversariantesHoje = clientes.filter(c => {
+    if (!c.dataNascimento) return false;
+    try {
+      const partes = c.dataNascimento.split('-');
+      if (partes.length < 3) return false;
+      const nascMes = parseInt(partes[1]);
+      const nascDia = parseInt(partes[2]);
+      
+      const hoje = new Date();
+      const hojeMes = hoje.getMonth() + 1;
+      const hojeDia = hoje.getDate();
+      
+      return nascMes === hojeMes && nascDia === hojeDia;
+    } catch (e) {
+      return false;
+    }
+  });
 
   // 4. Estoques
   let produtosBaixoEstoque = 0;
@@ -204,6 +224,30 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
             </div>
             <button onClick={() => setActiveTab('crediario')} className="btn btn-secondary btn-xs" style={{ borderColor: 'var(--color-info)', color: 'var(--color-info)', background: 'transparent' }}>
               Cobrar
+            </button>
+          </div>
+        )}
+
+        {/* Alertas Aniversariantes do Dia */}
+        {aniversariantesHoje.length > 0 && (
+          <div className="card" style={{ 
+            padding: '14px', 
+            background: 'rgba(168, 85, 247, 0.08)', 
+            borderColor: 'rgba(168, 85, 247, 0.4)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px',
+            borderLeft: '4px solid #a855f7'
+          }}>
+            <Cake color="#a855f7" size={24} />
+            <div style={{ flex: 1 }}>
+              <strong style={{ fontSize: '0.85rem', display: 'block', color: 'var(--text-primary)' }}>Aniversariantes de Hoje! 🎉</strong>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {aniversariantesHoje.map(c => c.nome.split(' ')[0]).join(', ')} faz(em) aniversário hoje! Envie uma mensagem.
+              </span>
+            </div>
+            <button onClick={() => setActiveTab('pessoas')} className="btn btn-secondary btn-xs" style={{ borderColor: '#a855f7', color: '#a855f7', background: 'transparent', fontWeight: 700 }}>
+              Ver
             </button>
           </div>
         )}

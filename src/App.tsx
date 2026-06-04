@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { PDV } from './pages/PDV';
 import { Crediario } from './pages/Crediario';
 import { Pessoas } from './pages/Pessoas';
+import { Fornecedores } from './pages/Fornecedores';
 import { Produtos } from './pages/Produtos';
 import { Configuracoes } from './pages/Configuracoes';
 import { Login } from './components/Login';
@@ -74,6 +75,8 @@ function AppContent() {
         return <Crediario filterText={searchTerm} />;
       case 'pessoas':
         return <Pessoas filterText={searchTerm} />;
+      case 'fornecedores':
+        return <Fornecedores filterText={searchTerm} />;
       case 'produtos':
         return <Produtos filterText={searchTerm} />;
       case 'configuracoes':

@@ -11,7 +11,8 @@ import {
   Database,
   Printer,
   History,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -24,15 +25,34 @@ export const Configuracoes: React.FC = () => {
     logs, 
     limparBanco, 
     exportarDados, 
-    importarDados 
+    importarDados,
+    systemConfig,
+    updateSystemConfig
   } = useApp();
 
   const { hasAccess, currentProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados locais
-  const [activeSubTab, setActiveSubTab] = useState<'relatorios' | 'backup' | 'logs'>('relatorios');
+  const [activeSubTab, setActiveSubTab] = useState<'relatorios' | 'backup' | 'logs' | 'crm_cashback'>('relatorios');
   const [showPrintView, setShowPrintView] = useState<'none' | 'fechamento' | 'produtos_sem_giro' | 'inadimplentes'>('none');
+
+  const [cashbackAtivo, setCashbackAtivo] = useState(systemConfig.cashbackAtivo);
+  const [cashbackPercentual, setCashbackPercentual] = useState(systemConfig.cashbackPercentual);
+  const [cashbackMinimoResgate, setCashbackMinimoResgate] = useState(systemConfig.cashbackMinimoResgate);
+  const [mensagemAniversario, setMensagemAniversario] = useState(systemConfig.mensagemAniversario);
+
+  const handleSaveConfigs = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSystemConfig({
+      cashbackAtivo,
+      cashbackPercentual: Number(cashbackPercentual),
+      cashbackMinimoResgate: Number(cashbackMinimoResgate),
+      cashbackValidadeDias: systemConfig.cashbackValidadeDias,
+      mensagemAniversario
+    });
+    alert('Configurações de Fidelidade & CRM salvas com sucesso!');
+  };
 
   // --- CONTROLE DE BACKUP E RESTAURAÇÃO ---
   const handleExportBackup = () => {
@@ -123,11 +143,11 @@ export const Configuracoes: React.FC = () => {
   return (
     <div className="configuracoes-container">
       {/* ABAS SECUNDÁRIAS */}
-      <div className="card glass" style={{ padding: '8px', marginBottom: '20px', display: 'flex', gap: '8px' }}>
+      <div className="card glass" style={{ padding: '8px', marginBottom: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveSubTab('relatorios')}
           className={`btn ${activeSubTab === 'relatorios' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: '130px' }}
         >
           <FileText size={18} />
           Relatórios & PDF
@@ -135,7 +155,7 @@ export const Configuracoes: React.FC = () => {
         <button
           onClick={() => setActiveSubTab('backup')}
           className={`btn ${activeSubTab === 'backup' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: '130px' }}
         >
           <Database size={18} />
           Backup & Banco
@@ -143,10 +163,18 @@ export const Configuracoes: React.FC = () => {
         <button
           onClick={() => setActiveSubTab('logs')}
           className={`btn ${activeSubTab === 'logs' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: '130px' }}
         >
           <History size={18} />
           Logs de Auditoria
+        </button>
+        <button
+          onClick={() => setActiveSubTab('crm_cashback')}
+          className={`btn ${activeSubTab === 'crm_cashback' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ flex: 1, minWidth: '130px' }}
+        >
+          <Sparkles size={18} />
+          Fidelidade & CRM
         </button>
       </div>
 
@@ -303,6 +331,88 @@ export const Configuracoes: React.FC = () => {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* --- SUB-ABA 4: FIDELIDADE & CRM --- */}
+      {activeSubTab === 'crm_cashback' && (
+        <div className="card glass" style={{ padding: '20px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={18} style={{ color: 'var(--primary-color)' }} />
+            Programa de Cashback & CRM
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Configure o percentual de cashback que seus clientes recebem ao realizar compras na loja e personalize as mensagens automáticas de aniversário.
+          </p>
+
+          <form onSubmit={handleSaveConfigs} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-primary)', padding: '14px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border-color)' }}>
+              <input
+                type="checkbox"
+                id="cashbackAtivo"
+                checked={cashbackAtivo}
+                onChange={(e) => setCashbackAtivo(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <label htmlFor="cashbackAtivo" style={{ fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', userSelect: 'none' }}>
+                Ativar Programa de Cashback no Sistema Geral
+              </label>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Percentual de Cashback (%)</label>
+                <input
+                  type="number"
+                  min="0.1"
+                  max="100"
+                  step="0.1"
+                  required
+                  disabled={!cashbackAtivo}
+                  value={cashbackPercentual}
+                  onChange={(e) => setCashbackPercentual(Number(e.target.value))}
+                  className="form-input"
+                  placeholder="Ex: 5"
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Porcentagem calculada sobre o total de cada pagamento efetuado.</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Valor Mínimo para Resgate (R$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  disabled={!cashbackAtivo}
+                  value={cashbackMinimoResgate}
+                  onChange={(e) => setCashbackMinimoResgate(Number(e.target.value))}
+                  className="form-input"
+                  placeholder="Ex: 10.00"
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>O saldo de cashback do cliente deve atingir este valor para ser resgatado como desconto.</span>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Mensagem Padrão de Aniversário (WhatsApp)</label>
+              <textarea
+                required
+                value={mensagemAniversario}
+                onChange={(e) => setMensagemAniversario(e.target.value)}
+                className="form-input"
+                style={{ minHeight: '100px', resize: 'vertical' }}
+                placeholder="Insira a mensagem que será enviada para os clientes no aniversário..."
+              />
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', background: 'var(--bg-primary)', padding: '8px', borderRadius: 'var(--radius-xs)' }}>
+                💡 <strong>Dica:</strong> Use a tag <strong>{`{nome}`}</strong> no text para que o sistema substitua automaticamente pelo primeiro nome do cliente na hora de abrir a mensagem no WhatsApp.
+              </div>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: 'fit-content', padding: '10px 24px', fontWeight: 700, marginTop: '10px' }}>
+              Salvar Configurações
+            </button>
+          </form>
         </div>
       )}
 

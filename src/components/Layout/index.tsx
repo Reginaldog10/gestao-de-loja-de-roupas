@@ -6,6 +6,7 @@ import {
   ShoppingBag, 
   CreditCard, 
   Users, 
+  Building2,
   Package, 
   Settings, 
   Sun, 
@@ -54,7 +55,8 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
     { id: 'pdv', label: 'PDV', icon: ShoppingBag },
     { id: 'crediario', label: 'Crediário', icon: CreditCard },
-    { id: 'pessoas', label: 'Contatos', icon: Users },
+    { id: 'pessoas', label: 'Clientes', icon: Users },
+    { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
     { id: 'produtos', label: 'Produtos', icon: Package },
     { id: 'configuracoes', label: 'Ajustes', icon: Settings },
   ];

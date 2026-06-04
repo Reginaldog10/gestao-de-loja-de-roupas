@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 
-export type UserProfile = 'administrador' | 'vendedor' | 'caixa';
+export type UserProfile = 'superadmin' | 'administrador' | 'vendedor' | 'caixa';
 
 export interface PermissionGate {
   finance_view: boolean;     // Visualizar lucros, totais financeiros, faturamento
@@ -13,21 +13,39 @@ export interface PermissionGate {
   settings_view: boolean;    // Configurações, logs e backups do sistema
 }
 
+interface AuthStoreInfo {
+  nome: string;
+  slug: string;
+  status: 'ativo' | 'bloqueado' | 'expirado';
+  expiracao: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   currentProfile: UserProfile;
-  setProfile: (profile: UserProfile) => void; // Mantido para compatibilidade, mas atualiza no banco
+  setProfile: (profile: UserProfile) => void;
   permissions: PermissionGate;
   hasAccess: (permission: keyof PermissionGate) => boolean;
-  login: (email: string, senha: string) => Promise<{ error: any }>;
-  signup: (email: string, senha: string, nome: string, perfil: UserProfile) => Promise<{ error: any }>;
+  login: (email: string, senha: string) => Promise<{ data: any; error: any }>;
+  signup: (email: string, senha: string, nome: string, perfil: UserProfile, lojaId?: string) => Promise<{ data: any; error: any }>;
   logout: () => Promise<void>;
   loading: boolean;
+  lojaId: string | null;
+  lojaInfo: AuthStoreInfo | null;
+  reloadStoreStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PERMISSION_MAP: Record<UserProfile, PermissionGate> = {
+  superadmin: {
+    finance_view: true,
+    finance_modify: true,
+    products_view: true,
+    products_modify: true,
+    sales_create: true,
+    settings_view: true,
+  },
   administrador: {
     finance_view: true,
     finance_modify: true,
@@ -58,21 +76,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [currentProfile, setCurrentProfileState] = useState<UserProfile>('vendedor');
   const [permissions, setPermissions] = useState<PermissionGate>(PERMISSION_MAP.vendedor);
+  const [lojaId, setLojaId] = useState<string | null>(null);
+  const [lojaInfo, setLojaInfo] = useState<AuthStoreInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Função para buscar o perfil do banco ou fallback para os metadados do usuário
   const fetchUserProfile = async (currentUser: User) => {
     try {
-      // 1. Tentar buscar na tabela de perfis
+      // 1. Tentar buscar na tabela de perfis incluindo dados da loja relacionada
       const { data, error } = await supabase
         .from('perfis')
-        .select('perfil')
+        .select(`
+          perfil, 
+          loja_id,
+          lojas (
+            nome,
+            slug,
+            status,
+            expiracao
+          )
+        `)
         .eq('id', currentUser.id)
         .single();
 
       if (error || !data) {
         // 2. Fallback defensivo: ler de user_metadata caso o trigger do banco não tenha rodado ainda
         const metadataPerfil = currentUser.user_metadata?.perfil as UserProfile;
+        const metadataLojaId = currentUser.user_metadata?.loja_id as string;
+        
+        setLojaId(metadataLojaId || null);
+        setLojaInfo(null);
+        
         if (metadataPerfil && PERMISSION_MAP[metadataPerfil]) {
           setCurrentProfileState(metadataPerfil);
           setPermissions(PERMISSION_MAP[metadataPerfil]);
@@ -83,14 +117,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         const dbPerfil = data.perfil as UserProfile;
+        const dbLojaId = data.loja_id as string;
+        
+        setLojaId(dbLojaId || null);
         setCurrentProfileState(dbPerfil);
         setPermissions(PERMISSION_MAP[dbPerfil]);
+        
+        if (data.lojas) {
+          // data.lojas pode vir como objeto simples ou array dependendo da tipagem do Supabase, geralmente é objeto devido ao link 1:1
+          const loja = data.lojas as any;
+          setLojaInfo({
+            nome: loja.nome,
+            slug: loja.slug,
+            status: loja.status,
+            expiracao: loja.expiracao
+          });
+        } else {
+          setLojaInfo(null);
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar perfil do usuário:', err);
       // Fallback em caso de falha de conexão/tabela inexistente
       setCurrentProfileState('vendedor');
       setPermissions(PERMISSION_MAP.vendedor);
+      setLojaId(null);
+      setLojaInfo(null);
+    }
+  };
+
+  const reloadStoreStatus = async () => {
+    if (user) {
+      await fetchUserProfile(user);
     }
   };
 
@@ -99,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        fetchUserProfile(session.user);
+        fetchUserProfile(session.user).then(() => setLoading(false));
       } else {
         setUser(null);
         setLoading(false);
@@ -115,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setCurrentProfileState('vendedor');
         setPermissions(PERMISSION_MAP.vendedor);
+        setLojaId(null);
+        setLojaInfo(null);
       }
       setLoading(false);
     });
@@ -132,7 +192,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { data, error };
   };
 
-  const signup = async (email: string, senha: string, nome: string, perfil: UserProfile) => {
+  const signup = async (email: string, senha: string, nome: string, perfil: UserProfile, lojaId?: string) => {
     // Criamos o usuário passando dados adicionais em user_metadata
     // Esses dados são lidos pelo trigger do banco de dados do Supabase
     const { data, error } = await supabase.auth.signUp({
@@ -142,6 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: {
           nome,
           perfil,
+          loja_id: lojaId,
         },
       },
     });
@@ -185,7 +246,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       signup, 
       logout,
-      loading 
+      loading,
+      lojaId,
+      lojaInfo,
+      reloadStoreStatus
     }}>
       {children}
     </AuthContext.Provider>

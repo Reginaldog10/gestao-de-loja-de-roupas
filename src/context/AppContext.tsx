@@ -725,7 +725,7 @@ const mapLogToDB = (l: Partial<LogOperacao>) => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, lojaId } = useAuth();
   
   // --- INICIALIZAÇÃO DE ESTADOS ---
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -872,7 +872,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Sincronizar atualizações no Supabase
       if (user) {
         const parcelasAfetadas = novasParcelas.filter((p, i) => p.status !== parcelas[i].status);
-        supabase.from('parcelas').upsert(parcelasAfetadas.map(mapParcelaToDB)).then(({ error }) => {
+        const dbParcelas = parcelasAfetadas.map(p => {
+          const dbP = mapParcelaToDB(p);
+          if (lojaId) dbP.loja_id = lojaId;
+          return dbP;
+        });
+        supabase.from('parcelas').upsert(dbParcelas).then(({ error }) => {
           if (error) console.error('Erro ao sincronizar parcelas vencidas:', error);
         });
       }
@@ -897,7 +902,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_logs', [novoLog, ...logs], setLogs);
 
     if (user) {
-      supabase.from('logs_operacao').insert(mapLogToDB(novoLog)).then(({ error }) => {
+      const dbLog = mapLogToDB(novoLog);
+      if (lojaId) dbLog.loja_id = lojaId;
+      supabase.from('logs_operacao').insert(dbLog).then(({ error }) => {
         if (error) console.error('Erro ao registrar log no Supabase:', error);
       });
     }
@@ -916,7 +923,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_clientes', [...clientes, novo], setClientes);
 
     if (user) {
-      supabase.from('clientes').insert(mapClienteToDB(novo)).then(({ error }) => {
+      const dbCliente = mapClienteToDB(novo);
+      if (lojaId) dbCliente.loja_id = lojaId;
+      supabase.from('clientes').insert(dbCliente).then(({ error }) => {
         if (error) console.error('Erro ao salvar cliente no Supabase:', error);
       });
     }
@@ -959,7 +968,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_fornecedores', [...fornecedores, novo], setFornecedores);
 
     if (user) {
-      supabase.from('fornecedores').insert(mapFornecedorToDB(novo)).then(({ error }) => {
+      const dbFornecedor = mapFornecedorToDB(novo);
+      if (lojaId) dbFornecedor.loja_id = lojaId;
+      supabase.from('fornecedores').insert(dbFornecedor).then(({ error }) => {
         if (error) console.error('Erro ao salvar fornecedor no Supabase:', error);
       });
     }
@@ -1005,7 +1016,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_produtos', [...produtos, novo], setProdutos);
 
     if (user) {
-      supabase.from('produtos').insert(mapProdutoToDB(novo)).then(({ error }) => {
+      const dbProduto = mapProdutoToDB(novo);
+      if (lojaId) dbProduto.loja_id = lojaId;
+      supabase.from('produtos').insert(dbProduto).then(({ error }) => {
         if (error) console.error('Erro ao salvar produto no Supabase:', error);
       });
     }
@@ -1028,7 +1041,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         novasMovs.push(novaMov);
 
         if (user) {
-          supabase.from('movimentacoes_estoque').insert(mapMovimentacaoToDB(novaMov)).then(({ error }) => {
+          const dbMov = mapMovimentacaoToDB(novaMov);
+          if (lojaId) dbMov.loja_id = lojaId;
+          supabase.from('movimentacoes_estoque').insert(dbMov).then(({ error }) => {
             if (error) console.error('Erro ao salvar movimentação inicial no Supabase:', error);
           });
         }
@@ -1129,7 +1144,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_movimentacoes', [novaMov, ...movimentacoesEstoque], setMovimentacoesEstoque);
 
     if (user) {
-      supabase.from('movimentacoes_estoque').insert(mapMovimentacaoToDB(novaMov)).then(({ error }) => {
+      const dbMov = mapMovimentacaoToDB(novaMov);
+      if (lojaId) dbMov.loja_id = lojaId;
+      supabase.from('movimentacoes_estoque').insert(dbMov).then(({ error }) => {
         if (error) console.error('Erro ao salvar movimentação no Supabase:', error);
       });
     }
@@ -1148,7 +1165,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_encomendas', [...encomendas, nova], setEncomendas);
 
     if (user) {
-      supabase.from('encomendas').insert(mapEncomendaToDB(nova)).then(({ error }) => {
+      const dbEncomenda = mapEncomendaToDB(nova);
+      if (lojaId) dbEncomenda.loja_id = lojaId;
+      supabase.from('encomendas').insert(dbEncomenda).then(({ error }) => {
         if (error) console.error('Erro ao salvar encomenda no Supabase:', error);
       });
     }
@@ -1206,7 +1225,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAndSet('erp_vendas', [novaVenda, ...vendas], setVendas);
 
     if (user) {
-      supabase.from('vendas').insert(mapVendaToDB(novaVenda)).then(({ error }) => {
+      const dbVenda = mapVendaToDB(novaVenda);
+      if (lojaId) dbVenda.loja_id = lojaId;
+      supabase.from('vendas').insert(dbVenda).then(({ error }) => {
         if (error) console.error('Erro ao salvar venda no Supabase:', error);
       });
     }
@@ -1241,10 +1262,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         novasMovs.push(novaMov);
 
         if (user) {
-          supabase.from('produtos').update({ tamanhos: novosTamanhos }).eq('id', item.produtoId).then(({ error }) => {
-            if (error) console.error('Erro ao abater estoque no Supabase:', error);
-          });
-          supabase.from('movimentacoes_estoque').insert(mapMovimentacaoToDB(novaMov)).then(({ error }) => {
+          const dbMov = mapMovimentacaoToDB(novaMov);
+          if (lojaId) dbMov.loja_id = lojaId;
+          supabase.from('movimentacoes_estoque').insert(dbMov).then(({ error }) => {
             if (error) console.error('Erro ao salvar movimentação de venda no Supabase:', error);
           });
         }
@@ -1274,7 +1294,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveAndSet('erp_parcelas', [...novasParcelasSalvas, ...parcelas], setParcelas);
 
       if (user) {
-        supabase.from('parcelas').insert(novasParcelasSalvas.map(p => mapParcelaToDB(p))).then(({ error }) => {
+        const dbParcelas = novasParcelasSalvas.map(p => {
+          const dbP = mapParcelaToDB(p);
+          if (lojaId) dbP.loja_id = lojaId;
+          return dbP;
+        });
+        supabase.from('parcelas').insert(dbParcelas).then(({ error }) => {
           if (error) console.error('Erro ao salvar parcelas no Supabase:', error);
         });
       }

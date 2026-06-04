@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../utils/supabaseClient';
 import { 
   Download, 
   Upload, 
@@ -12,7 +13,10 @@ import {
   Printer,
   History,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Key,
+  Loader2,
+  Check
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -30,17 +34,29 @@ export const Configuracoes: React.FC = () => {
     updateSystemConfig
   } = useApp();
 
-  const { hasAccess, currentProfile } = useAuth();
+  const { hasAccess, currentProfile, lojaInfo, lojaId, reloadStoreStatus } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados locais
-  const [activeSubTab, setActiveSubTab] = useState<'relatorios' | 'backup' | 'logs' | 'crm_cashback'>('relatorios');
+  const [activeSubTab, setActiveSubTab] = useState<'relatorios' | 'backup' | 'logs' | 'crm_cashback' | 'licenca'>('relatorios');
+  
+  useEffect(() => {
+    const savedSubTab = localStorage.getItem('erp_configuracoes_subtab');
+    if (savedSubTab === 'licenca') {
+      setActiveSubTab('licenca');
+      localStorage.removeItem('erp_configuracoes_subtab');
+    }
+  }, []);
+
   const [showPrintView, setShowPrintView] = useState<'none' | 'fechamento' | 'produtos_sem_giro' | 'inadimplentes'>('none');
 
   const [cashbackAtivo, setCashbackAtivo] = useState(systemConfig.cashbackAtivo);
   const [cashbackPercentual, setCashbackPercentual] = useState(systemConfig.cashbackPercentual);
   const [cashbackMinimoResgate, setCashbackMinimoResgate] = useState(systemConfig.cashbackMinimoResgate);
   const [mensagemAniversario, setMensagemAniversario] = useState(systemConfig.mensagemAniversario);
+
+  const [tokenVal, setTokenVal] = useState('');
+  const [savingToken, setSavingToken] = useState(false);
 
   const handleSaveConfigs = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +68,30 @@ export const Configuracoes: React.FC = () => {
       mensagemAniversario
     });
     alert('Configurações de Fidelidade & CRM salvas com sucesso!');
+  };
+
+  const handleAtivarToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tokenVal.trim() || !lojaId) return;
+
+    setSavingToken(true);
+    try {
+      const { error } = await supabase.rpc('resgatar_token_ativacao', {
+        p_token: tokenVal.trim(),
+        p_loja_id: lojaId
+      });
+
+      if (error) throw error;
+
+      alert('Licença ativada e prorrogada com sucesso!');
+      setTokenVal('');
+      await reloadStoreStatus();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Erro ao resgatar token. Verifique se o código está correto e tente novamente.');
+    } finally {
+      setSavingToken(false);
+    }
   };
 
   // --- CONTROLE DE BACKUP E RESTAURAÇÃO ---
@@ -175,6 +215,14 @@ export const Configuracoes: React.FC = () => {
         >
           <Sparkles size={18} />
           Fidelidade & CRM
+        </button>
+        <button
+          onClick={() => setActiveSubTab('licenca')}
+          className={`btn ${activeSubTab === 'licenca' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ flex: 1, minWidth: '130px' }}
+        >
+          <ShieldCheck size={18} />
+          Licença & Plano
         </button>
       </div>
 
@@ -413,6 +461,84 @@ export const Configuracoes: React.FC = () => {
               Salvar Configurações
             </button>
           </form>
+        </div>
+      )}
+
+      {/* --- SUB-ABA 5: LICENÇA & PLANO --- */}
+      {activeSubTab === 'licenca' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Card Detalhes da Licença */}
+          <div className="card glass" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={20} style={{ color: 'var(--primary-color)' }} />
+              Detalhes da Licença da Loja
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', background: 'var(--bg-primary)', padding: '16px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700 }}>NOME DA LOJA</span>
+                <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-primary)', marginTop: '4px' }}>{lojaInfo?.nome || 'Minha Loja'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700 }}>IDENTIFICADOR (SLUG)</span>
+                <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-primary)', marginTop: '4px' }}>/{lojaInfo?.slug || 'slug'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700 }}>STATUS DA LICENÇA</span>
+                <strong style={{ display: 'block', marginTop: '4px' }}>
+                  <span className={`status-badge ${lojaInfo?.status === 'ativo' ? 'status-paga' : 'status-vencida'}`} style={{ fontSize: '0.75rem' }}>
+                    {lojaInfo?.status === 'ativo' ? 'ATIVO / REGULAR' : 'SUSPENSO / EXPIRADO'}
+                  </span>
+                </strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700 }}>DATA DE VENCIMENTO</span>
+                <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-primary)', marginTop: '4px' }}>
+                  {lojaInfo?.expiracao ? formatDate(lojaInfo.expiracao.split('T')[0]) : 'Sem expiração'}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Resgatar Token */}
+          <div className="card glass" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Key size={18} className="text-secondary" />
+              Renovar ou Estender Licença por Token
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Caso você possua um Token de Ativação enviado pelo suporte, digite-o no campo abaixo para prorrogar os dias de licença da sua loja.
+            </p>
+
+            <form onSubmit={handleAtivarToken} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
+              <div className="form-group" style={{ flex: 1, minWidth: '220px', marginBottom: 0 }}>
+                <label className="form-label">Código do Token</label>
+                <div className="input-icon-wrapper">
+                  <Key size={18} className="input-icon text-muted" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: GLOW-ACT-30D-XXXX-XXXX"
+                    value={tokenVal}
+                    onChange={(e) => setTokenVal(e.target.value)}
+                    className="form-input"
+                    disabled={savingToken}
+                  />
+                </div>
+              </div>
+              
+              <button 
+                type="submit" 
+                className="btn btn-primary"
+                disabled={savingToken}
+                style={{ padding: '10px 24px', height: 'var(--input-height)' }}
+              >
+                {savingToken ? <Loader2 size={16} className="spinner" /> : <Check size={16} />}
+                <span>Ativar Licença</span>
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

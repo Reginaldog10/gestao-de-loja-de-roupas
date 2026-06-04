@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import type { UserProfile } from '../../context/AuthContext';
-import { Mail, Lock, User, Shield, ArrowRight, Loader2, Sparkles } from 'lucide-react';
-import { isOfflineMode } from '../../utils/supabaseClient';
+import { Mail, Lock, User, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { supabase, isOfflineMode } from '../../utils/supabaseClient';
 import './login.css';
 
 export const Login: React.FC = () => {
@@ -13,7 +12,32 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
-  const [perfil, setPerfil] = useState<UserProfile>('vendedor');
+  const [nomeLoja, setNomeLoja] = useState('');
+  const [slugLoja, setSlugLoja] = useState('');
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  
+  const slugify = (text: string) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  };
+
+  const handleNomeLojaChange = (val: string) => {
+    setNomeLoja(val);
+    if (!isSlugManuallyEdited) {
+      setSlugLoja(slugify(val));
+    }
+  };
+
+  const handleSlugLojaChange = (val: string) => {
+    setIsSlugManuallyEdited(true);
+    setSlugLoja(val.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+  };
   
   // Estados de controle
   const [loading, setLoading] = useState(false);
@@ -31,15 +55,82 @@ export const Login: React.FC = () => {
         if (!nome.trim()) {
           throw new Error('Por favor, informe seu nome.');
         }
+        if (!nomeLoja.trim()) {
+          throw new Error('Por favor, informe o nome da loja.');
+        }
+        if (!slugLoja.trim()) {
+          throw new Error('Por favor, defina um identificador de URL (slug) para a loja.');
+        }
         if (password.length < 6) {
           throw new Error('A senha deve ter pelo menos 6 caracteres.');
         }
-        const { error } = await signup(email, password, nome, perfil);
-        if (error) throw error;
+
+        // Formatar o slug da loja
+        const formattedSlug = slugLoja
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, '') // remove acentos, espaços e caracteres especiais
+          .replace(/-+/g, '-');       // evita múltiplos hífens seguidos
+
+        if (!formattedSlug) {
+          throw new Error('O identificador de URL da loja deve conter apenas letras, números e hífens.');
+        }
+
+        let lojaId = undefined;
+
+        if (!isOfflineMode) {
+          // Buscar período de testes padrão
+          let diasTeste = 30;
+          try {
+            const { data: configData, error: configError } = await supabase
+              .from('saas_config')
+              .select('dias_teste_padrao')
+              .eq('id', 'global')
+              .single();
+            
+            if (!configError && configData) {
+              diasTeste = configData.dias_teste_padrao;
+            }
+          } catch (e) {
+            console.error('Erro ao buscar saas_config, utilizando fallback de 30 dias:', e);
+          }
+
+          // 1. Criar a nova loja no banco de dados
+          const { data: lojaData, error: lojaError } = await supabase
+            .from('lojas')
+            .insert({
+              nome: nomeLoja.trim(),
+              slug: formattedSlug,
+              status: 'ativo',
+              expiracao: new Date(Date.now() + diasTeste * 24 * 60 * 60 * 1000).toISOString()
+            })
+            .select('id')
+            .single();
+
+          if (lojaError) {
+            if (lojaError.message.includes('slug') || lojaError.code === '23505') {
+              throw new Error('O identificador de URL (slug) digitado já está sendo usado por outra loja.');
+            }
+            throw lojaError;
+          }
+
+          lojaId = lojaData.id;
+        }
+
+        // 2. Criar o usuário e associá-lo a essa loja com perfil administrador
+        const { error } = await signup(email, password, nome, 'administrador', lojaId);
         
-        setSuccessMsg('Conta criada com sucesso! Você já pode fazer login.');
+        if (error) {
+          // Se der erro no cadastro do usuário e a loja foi criada, podemos opcionalmente deletá-la,
+          // mas vamos apenas exibir o erro para que ele tente cadastrar novamente.
+          throw error;
+        }
+        
+        setSuccessMsg('Sua loja e sua conta de administrador foram criadas com sucesso! Faça login para começar.');
         setIsRegister(false);
         setPassword('');
+        setNomeLoja('');
+        setSlugLoja('');
       } else {
         const { error } = await login(email, password);
         if (error) throw error;
@@ -182,23 +273,42 @@ export const Login: React.FC = () => {
           </div>
 
           {isRegister && (
-            <div className="form-group">
-              <label htmlFor="perfil">Perfil de Acesso</label>
-              <div className="input-icon-wrapper">
-                <Shield size={18} className="input-icon" />
-                <select
-                  id="perfil"
-                  value={perfil}
-                  onChange={(e) => setPerfil(e.target.value as UserProfile)}
-                  disabled={loading}
-                  className="perfil-select-auth"
-                >
-                  <option value="vendedor">Vendedor (Vendas & Estoque)</option>
-                  <option value="caixa">Caixa (Operador Financeiro)</option>
-                  <option value="administrador">Administrador (Acesso Total)</option>
-                </select>
+            <>
+              <div className="form-group">
+                <label htmlFor="nomeLoja">Nome da Loja</label>
+                <div className="input-icon-wrapper">
+                  <Sparkles size={18} className="input-icon text-muted" />
+                  <input
+                    id="nomeLoja"
+                    type="text"
+                    placeholder="Ex: Glow Modas Filial Centro"
+                    value={nomeLoja}
+                    onChange={(e) => handleNomeLojaChange(e.target.value)}
+                    required={isRegister}
+                    disabled={loading}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div className="form-group">
+                <label htmlFor="slugLoja">Identificador da URL (Ex: minha-loja)</label>
+                <div className="input-icon-wrapper">
+                  <Sparkles size={18} className="input-icon text-muted" />
+                  <input
+                    id="slugLoja"
+                    type="text"
+                    placeholder="Ex: glowmodas-centro"
+                    value={slugLoja}
+                    onChange={(e) => handleSlugLojaChange(e.target.value)}
+                    required={isRegister}
+                    disabled={loading}
+                  />
+                </div>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px', display: 'block' }}>
+                  Apenas letras minúsculas, números e hífens.
+                </span>
+              </div>
+            </>
           )}
 
           <button 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   TrendingUp, 
   CreditCard, 
@@ -20,6 +21,17 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
     clientes, 
     produtos 
   } = useApp();
+
+  const { lojaInfo } = useAuth();
+
+  // Calcular dias de teste restantes
+  let diffDays = 0;
+  if (lojaInfo?.expiracao) {
+    const expDate = new Date(lojaInfo.expiracao);
+    const hoje = new Date();
+    const diffTime = expDate.getTime() - hoje.getTime();
+    diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
 
   // --- CÁLCULO DOS INDICADORES ---
   const hojeStr = new Date().toISOString().split('T')[0];
@@ -146,6 +158,45 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
   return (
     <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
+      {/* BANNER DE TESTE */}
+      {diffDays > 0 && diffDays <= 30 && (
+        <div 
+          onClick={() => {
+            localStorage.setItem('erp_configuracoes_subtab', 'licenca');
+            setActiveTab('configuracoes');
+          }}
+          style={{
+            background: 'linear-gradient(135deg, #db2777 0%, #7c3aed 100%)',
+            color: 'white',
+            padding: '16px 20px',
+            borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            boxShadow: '0 8px 24px rgba(124, 58, 237, 0.25)',
+            userSelect: 'none',
+            animation: 'pulse-slow 2s infinite alternate'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Sparkles size={20} color="#fff" />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <strong style={{ fontSize: '0.9rem', display: 'block' }}>Período de Teste Grátis Ativo</strong>
+              <span style={{ fontSize: '0.8rem', opacity: 0.95 }}>
+                Sua loja está em avaliação. Restam <strong>{diffDays} {diffDays === 1 ? 'dia' : 'dias'}</strong> de uso gratuito. Clique aqui para ativar sua licença por token.
+              </span>
+            </div>
+          </div>
+          <button className="btn btn-secondary btn-xs" style={{ background: 'white', color: '#7c3aed', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}>
+            Ativar Licença
+          </button>
+        </div>
+      )}
+
       {/* BOAS VINDAS */}
       <div className="card glass" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--primary-gradient)', color: 'white', border: 'none' }}>
         <div>

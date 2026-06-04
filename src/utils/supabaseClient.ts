@@ -36,6 +36,7 @@ export interface MockSupabaseClient {
     signOut: () => Promise<{ error: any }>;
   };
   from: (tableName: string) => MockQueryBuilder;
+  rpc: (fnName: string, params?: any) => Promise<{ data: any; error: any }>;
 }
 
 export let supabase: MockSupabaseClient;
@@ -190,6 +191,11 @@ function setupMock() {
       };
 
       return chain;
+    },
+    // Mock do método RPC
+    rpc: async (fnName: string, params?: any) => {
+      console.log(`[Supabase Mock] RPC ${fnName} chamada com params:`, params);
+      return { data: true, error: null };
     }
   };
 }

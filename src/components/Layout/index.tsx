@@ -51,15 +51,21 @@ export const Layout: React.FC<LayoutProps> = ({
     localStorage.setItem('erp_theme', nextTheme);
   };
 
-  const navigationItems = [
-    { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
-    { id: 'pdv', label: 'PDV', icon: ShoppingBag },
-    { id: 'crediario', label: 'Crediário', icon: CreditCard },
-    { id: 'pessoas', label: 'Clientes', icon: Users },
-    { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
-    { id: 'produtos', label: 'Produtos', icon: Package },
-    { id: 'configuracoes', label: 'Ajustes', icon: Settings },
-  ];
+  const navigationItems = currentProfile === 'superadmin'
+    ? [
+        { id: 'super_dashboard', label: 'Painel SaaS', icon: LayoutDashboard },
+        { id: 'super_lojas', label: 'Lojas', icon: Building2 },
+        { id: 'super_planos', label: 'Planos', icon: Settings },
+      ]
+    : [
+        { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
+        { id: 'pdv', label: 'PDV', icon: ShoppingBag },
+        { id: 'crediario', label: 'Crediário', icon: CreditCard },
+        { id: 'pessoas', label: 'Clientes', icon: Users },
+        { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
+        { id: 'produtos', label: 'Produtos', icon: Package },
+        { id: 'configuracoes', label: 'Ajustes', icon: Settings },
+      ];
 
   return (
     <div className="app-container">
@@ -112,21 +118,23 @@ export const Layout: React.FC<LayoutProps> = ({
               {user?.user_metadata?.nome || user?.email?.split('@')[0]}
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>
-              Perfil: {currentProfile}
+              Perfil: {currentProfile === 'superadmin' ? 'SUPER ADMIN' : currentProfile}
             </div>
           </div>
-          <div className="profile-badge-container" style={{ marginBottom: '12px' }}>
-            <ShieldAlert size={16} className="profile-icon" />
-            <select
-              value={currentProfile}
-              onChange={(e) => setProfile(e.target.value as UserProfile)}
-              className="profile-select"
-            >
-              <option value="administrador">Admin (Acesso Total)</option>
-              <option value="caixa">Caixa (Operador)</option>
-              <option value="vendedor">Vendedor (Estoque/Venda)</option>
-            </select>
-          </div>
+          {currentProfile !== 'superadmin' && (
+            <div className="profile-badge-container" style={{ marginBottom: '12px' }}>
+              <ShieldAlert size={16} className="profile-icon" />
+              <select
+                value={currentProfile}
+                onChange={(e) => setProfile(e.target.value as UserProfile)}
+                className="profile-select"
+              >
+                <option value="administrador">Admin (Acesso Total)</option>
+                <option value="caixa">Caixa (Operador)</option>
+                <option value="vendedor">Vendedor (Estoque/Venda)</option>
+              </select>
+            </div>
+          )}
           <button 
             onClick={logout} 
             className="sidebar-nav-item" 
@@ -154,16 +162,24 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* TOP HEADER */}
       <div className="content-wrapper">
         <header className="top-header glass">
-          <div className="header-search-container">
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Busca rápida global em todo o sistema..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="global-search-input"
-            />
-          </div>
+          {currentProfile !== 'superadmin' ? (
+            <div className="header-search-container">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Busca rápida global em todo o sistema..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="global-search-input"
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 8px' }}>
+              <span className="status-badge status-paga" style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.5px' }}>
+                PAINEL SAAS GLOBAL
+              </span>
+            </div>
+          )}
 
           <div className="header-actions">
             {/* Tema Toggle */}
@@ -177,17 +193,19 @@ export const Layout: React.FC<LayoutProps> = ({
             </button>
 
             {/* Profile Dropdown para Mobile */}
-            <div className="mobile-profile-container">
-              <select
-                value={currentProfile}
-                onChange={(e) => setProfile(e.target.value as UserProfile)}
-                className="profile-select-mobile"
-              >
-                <option value="administrador">Admin</option>
-                <option value="caixa">Caixa</option>
-                <option value="vendedor">Vend.</option>
-              </select>
-            </div>
+            {currentProfile !== 'superadmin' && (
+              <div className="mobile-profile-container">
+                <select
+                  value={currentProfile}
+                  onChange={(e) => setProfile(e.target.value as UserProfile)}
+                  className="profile-select-mobile"
+                >
+                  <option value="administrador">Admin</option>
+                  <option value="caixa">Caixa</option>
+                  <option value="vendedor">Vend.</option>
+                </select>
+              </div>
+            )}
           </div>
         </header>
 

@@ -175,66 +175,52 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
             localStorage.setItem('erp_configuracoes_subtab', 'licenca');
             setActiveTab('configuracoes');
           }}
+          className="dashboard-banner"
           style={{
             background: 'linear-gradient(135deg, #db2777 0%, #7c3aed 100%)',
-            color: 'white',
-            padding: '16px 20px',
-            borderRadius: 'var(--radius-sm)',
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            boxShadow: '0 8px 24px rgba(124, 58, 237, 0.25)',
-            userSelect: 'none',
             animation: 'pulse-slow 2s infinite alternate'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="dashboard-banner-content">
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Sparkles size={20} color="#fff" />
             </div>
-            <div style={{ textAlign: 'left' }}>
+            <div>
               <strong style={{ fontSize: '0.9rem', display: 'block' }}>Período de Teste Grátis Ativo</strong>
               <span style={{ fontSize: '0.8rem', opacity: 0.95 }}>
                 Sua loja está em avaliação. Restam <strong>{diffDays} {diffDays === 1 ? 'dia' : 'dias'}</strong> de uso gratuito. Clique aqui para ativar sua licença por token.
               </span>
             </div>
           </div>
-          <button className="btn btn-secondary btn-xs" style={{ background: 'white', color: '#7c3aed', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}>
-            Ativar Licença
-          </button>
+          <div className="dashboard-banner-actions">
+            <button className="btn btn-secondary btn-xs" style={{ background: 'white', color: '#7c3aed', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}>
+              Ativar Licença
+            </button>
+          </div>
         </div>
       )}
 
       {/* BANNER COMPLETAR CADASTRO DA EMPRESA */}
       {currentProfile === 'administrador' && !dismissedEmpresaBanner && lojaInfo && (!lojaInfo.cnpj || !lojaInfo.endereco) && (
         <div 
+          className="dashboard-banner"
           style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            color: 'white',
-            padding: '16px 20px',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            boxShadow: '0 8px 24px rgba(29, 78, 216, 0.25)',
-            userSelect: 'none'
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="dashboard-banner-content">
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Building2 size={20} color="#fff" />
             </div>
-            <div style={{ textAlign: 'left' }}>
+            <div>
               <strong style={{ fontSize: '0.9rem', display: 'block' }}>Complete o Cadastro da sua Empresa</strong>
               <span style={{ fontSize: '0.8rem', opacity: 0.95 }}>
                 Adicione CNPJ, Telefone e Endereço nas Configurações para emitir relatórios timbrados e cupons com a sua marca.
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="dashboard-banner-actions">
             <button 
               onClick={handleDismissEmpresaBanner}
               className="btn btn-secondary btn-xs" 

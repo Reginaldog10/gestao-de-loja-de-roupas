@@ -433,3 +433,42 @@ a {
     text-align: right;
   }
 }
+
+/* --- Banners Responsivos da Dashboard --- */
+.dashboard-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+  color: white;
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  user-select: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.dashboard-banner-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .dashboard-banner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .dashboard-banner-actions {
+    width: auto;
+  }
+}

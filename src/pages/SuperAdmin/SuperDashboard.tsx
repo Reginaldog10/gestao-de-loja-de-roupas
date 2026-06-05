@@ -94,9 +94,19 @@ export const SuperDashboard: React.FC = () => {
 
           if (!configError && configData) {
             setDiasTestePadrao(configData.dias_teste_padrao);
+            localStorage.setItem('saas_dias_teste_padrao', String(configData.dias_teste_padrao));
+          } else {
+            const localVal = localStorage.getItem('saas_dias_teste_padrao');
+            if (localVal) {
+              setDiasTestePadrao(Number(localVal));
+            }
           }
         } catch (configErr) {
-          console.error('Erro ao buscar configuração saas_config:', configErr);
+          console.error('Erro ao buscar configuração saas_config, usando local:', configErr);
+          const localVal = localStorage.getItem('saas_dias_teste_padrao');
+          if (localVal) {
+            setDiasTestePadrao(Number(localVal));
+          }
         }
 
       } catch (err) {
@@ -114,19 +124,33 @@ export const SuperDashboard: React.FC = () => {
       setSavingConfig(true);
       setConfigMessage(null);
 
+      // Salvar localmente como redundância
+      localStorage.setItem('saas_dias_teste_padrao', String(dias));
+
       const { error } = await supabase
         .from('saas_config')
         .upsert({ id: 'global', dias_teste_padrao: dias });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Erro ao salvar no banco, mantendo local:', error);
+        setConfigMessage({ 
+          type: 'success', 
+          text: `Salvo localmente! Nota: a tabela saas_config pode não estar criada no banco.` 
+        });
+      } else {
+        setConfigMessage({ type: 'success', text: `Período de teste padrão atualizado para ${dias} dias!` });
+      }
 
       setDiasTestePadrao(dias);
-      setConfigMessage({ type: 'success', text: `Período de teste padrão atualizado para ${dias} dias!` });
-      
-      setTimeout(() => setConfigMessage(null), 3000);
+      setTimeout(() => setConfigMessage(null), 4000);
     } catch (err: any) {
       console.error('Erro ao salvar configuração do SaaS:', err);
-      setConfigMessage({ type: 'error', text: 'Falha ao salvar configuração.' });
+      setDiasTestePadrao(dias);
+      setConfigMessage({ 
+        type: 'success', 
+        text: `Salvo localmente! Nota: verifique a conexão com o banco.` 
+      });
+      setTimeout(() => setConfigMessage(null), 4000);
     } finally {
       setSavingConfig(false);
     }

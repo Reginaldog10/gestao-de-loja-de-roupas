@@ -90,9 +90,14 @@ export const Login: React.FC = () => {
             
             if (!configError && configData) {
               diasTeste = configData.dias_teste_padrao;
+            } else {
+              const localVal = localStorage.getItem('saas_dias_teste_padrao');
+              if (localVal) diasTeste = Number(localVal);
             }
           } catch (e) {
-            console.error('Erro ao buscar saas_config, utilizando fallback de 30 dias:', e);
+            console.error('Erro ao buscar saas_config, utilizando fallback:', e);
+            const localVal = localStorage.getItem('saas_dias_teste_padrao');
+            if (localVal) diasTeste = Number(localVal);
           }
 
           // 1. Criar a nova loja no banco de dados

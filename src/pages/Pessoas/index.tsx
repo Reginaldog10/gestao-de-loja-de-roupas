@@ -12,9 +12,44 @@ import {
   Edit3,
   X,
   Cake,
-  Gift
+  Gift,
+  Loader2
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatCPF, formatPhone } from '../../utils/formatters';
+
+const parseEnderecoConsolidado = (str: string) => {
+  const res = { rua: '', numero: '', bairro: '', cep: '' };
+  if (!str) return res;
+  
+  const matchRua = str.match(/Rua:\s*(.*?)(?=\s*\||$)/);
+  const matchNum = str.match(/Num:\s*(.*?)(?=\s*\||$)/);
+  const matchBairro = str.match(/Bairro:\s*(.*?)(?=\s*\||$)/);
+  const matchCep = str.match(/CEP:\s*(.*?)(?=\s*\||$)/);
+  
+  if (matchRua) res.rua = matchRua[1];
+  if (matchNum) res.numero = matchNum[1];
+  if (matchBairro) res.bairro = matchBairro[1];
+  if (matchCep) res.cep = matchCep[1];
+  
+  if (!matchRua && !matchNum && !matchBairro && !matchCep) {
+    res.rua = str;
+  }
+  
+  return res;
+};
+
+const parseCidadeConsolidada = (str: string) => {
+  const res = { cidade: '', uf: '' };
+  if (!str) return res;
+  const partes = str.split(' - ');
+  if (partes.length >= 2) {
+    res.uf = partes.pop() || '';
+    res.cidade = partes.join(' - ');
+  } else {
+    res.cidade = str;
+  }
+  return res;
+};
 
 // Função auxiliar para calcular quantos dias faltam para o aniversário do cliente
 const getDiasAteAniversario = (dataNascimentoStr: string): number => {
@@ -73,10 +108,17 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
   const [cliNascimento, setCliNascimento] = useState('');
   const [cliTelefone, setCliTelefone] = useState('');
   const [cliWhatsapp, setCliWhatsapp] = useState('');
-  const [cliEndereco, setCliEndereco] = useState('');
   const [cliCidade, setCliCidade] = useState('');
   const [cliLimite, setCliLimite] = useState(1000);
   const [cliObservacoes, setCliObservacoes] = useState('');
+
+  // Estados locais para endereço individual (ViaCEP)
+  const [cliCep, setCliCep] = useState('');
+  const [cliRua, setCliRua] = useState('');
+  const [cliNumero, setCliNumero] = useState('');
+  const [cliBairro, setCliBairro] = useState('');
+  const [cliUF, setCliUF] = useState('');
+  const [loadingCep, setLoadingCep] = useState(false);
 
   // Reset form
   const clearCliForm = () => {
@@ -86,10 +128,17 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
     setCliNascimento('');
     setCliTelefone('');
     setCliWhatsapp('');
-    setCliEndereco('');
     setCliCidade('');
     setCliLimite(1000);
     setCliObservacoes('');
+    
+    // Limpar endereço individual
+    setCliCep('');
+    setCliRua('');
+    setCliNumero('');
+    setCliBairro('');
+    setCliUF('');
+    setLoadingCep(false);
     setIsEditing(false);
   };
 
@@ -109,12 +158,68 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
     setCliNascimento(c.dataNascimento);
     setCliTelefone(c.telefone);
     setCliWhatsapp(c.whatsapp);
-    setCliEndereco(c.endereco);
     setCliCidade(c.cidade);
     setCliLimite(c.limiteCredito);
     setCliObservacoes(c.observacoes || '');
+
+    // Parse do endereço
+    if (c.endereco) {
+      const parsed = parseEnderecoConsolidado(c.endereco);
+      setCliCep(parsed.cep);
+      setCliRua(parsed.rua);
+      setCliNumero(parsed.numero);
+      setCliBairro(parsed.bairro);
+    } else {
+      setCliCep('');
+      setCliRua('');
+      setCliNumero('');
+      setCliBairro('');
+    }
+
+    // Parse da cidade
+    if (c.cidade) {
+      const parsed = parseCidadeConsolidada(c.cidade);
+      setCliCidade(parsed.cidade);
+      setCliUF(parsed.uf);
+    } else {
+      setCliCidade('');
+      setCliUF('');
+    }
+
     setIsEditing(true);
     setShowModal('cliente');
+  };
+
+  const handleCliCepChange = async (val: string) => {
+    const clean = val.replace(/\D/g, '').substring(0, 8);
+    let formatted = clean;
+    if (clean.length > 5) {
+      formatted = clean.substring(0, 5) + '-' + clean.substring(5);
+    }
+    setCliCep(formatted);
+
+    if (clean.length === 8) {
+      setLoadingCep(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setCliRua(data.logradouro || '');
+          setCliBairro(data.bairro || '');
+          setCliCidade(data.localidade || '');
+          setCliUF(data.uf || '');
+          
+          setTimeout(() => {
+            const numEl = document.getElementById('cli-numero-input');
+            if (numEl) numEl.focus();
+          }, 50);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar CEP do cliente:', err);
+      } finally {
+        setLoadingCep(false);
+      }
+    }
   };
 
   const handleSaveCliente = (e: React.FormEvent) => {
@@ -124,6 +229,10 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
       return;
     }
 
+    // Consolidar endereço
+    const enderecoConsolidado = `Rua: ${cliRua.trim()} | Num: ${cliNumero.trim()} | Bairro: ${cliBairro.trim()} | CEP: ${cliCep.trim()}`;
+    const cidadeConsolidada = `${cliCidade.trim()} - ${cliUF.trim().toUpperCase()}`;
+
     const payload = {
       nome: cliNome,
       cpf: formatCPF(cliCPF),
@@ -131,8 +240,8 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
       dataNascimento: cliNascimento,
       telefone: formatPhone(cliTelefone),
       whatsapp: cliWhatsapp.replace(/\D/g, ''),
-      endereco: cliEndereco,
-      cidade: cliCidade,
+      endereco: enderecoConsolidado,
+      cidade: cidadeConsolidada,
       limiteCredito: Number(cliLimite),
       observacoes: cliObservacoes
     };
@@ -558,26 +667,80 @@ export const Pessoas: React.FC<{ filterText: string }> = ({ filterText }) => {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Endereço Residencial</label>
-                <input
-                  type="text"
-                  placeholder="Rua, número, apto"
-                  value={cliEndereco}
-                  onChange={(e) => setCliEndereco(e.target.value)}
-                  className="form-input"
-                />
+              {/* Área de Endereço Residencial com ViaCEP */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">CEP (Digite para preencher)</label>
+                  <div className="input-icon-wrapper">
+                    <input
+                      type="text"
+                      placeholder="00000-000"
+                      value={cliCep}
+                      onChange={(e) => handleCliCepChange(e.target.value)}
+                      className="form-input"
+                      disabled={loadingCep}
+                    />
+                    {loadingCep && <Loader2 size={16} className="spinner input-icon" style={{ right: '12px', left: 'auto' }} />}
+                  </div>
+                </div>
+                <div className="form-group" style={{ flex: 2 }}>
+                  <label className="form-label">Logradouro / Rua</label>
+                  <input
+                    type="text"
+                    placeholder="Av. Paulista, Rua das Flores..."
+                    value={cliRua}
+                    onChange={(e) => setCliRua(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Cidade</label>
-                <input
-                  type="text"
-                  placeholder="Ex: São Paulo"
-                  value={cliCidade}
-                  onChange={(e) => setCliCidade(e.target.value)}
-                  className="form-input"
-                />
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 0.7 }}>
+                  <label className="form-label">Número / Apto</label>
+                  <input
+                    id="cli-numero-input"
+                    type="text"
+                    placeholder="Ex: 123, Bl. B"
+                    value={cliNumero}
+                    onChange={(e) => setCliNumero(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1.3 }}>
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    placeholder="Bairro"
+                    value={cliBairro}
+                    onChange={(e) => setCliBairro(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 2.5 }}>
+                  <label className="form-label">Cidade</label>
+                  <input
+                    type="text"
+                    placeholder="Cidade"
+                    value={cliCidade}
+                    onChange={(e) => setCliCidade(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 0.7 }}>
+                  <label className="form-label">UF</label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="SP"
+                    value={cliUF}
+                    onChange={(e) => setCliUF(e.target.value.toUpperCase())}
+                    className="form-input"
+                  />
+                </div>
               </div>
 
               <div className="form-group">

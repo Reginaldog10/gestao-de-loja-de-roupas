@@ -16,9 +16,44 @@ import {
   Sparkles,
   Key,
   Loader2,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { formatCurrency, formatDate, formatCNPJ, formatPhone } from '../../utils/formatters';
+
+const parseEnderecoConsolidado = (str: string) => {
+  const res = { rua: '', numero: '', bairro: '', cep: '' };
+  if (!str) return res;
+  
+  const matchRua = str.match(/Rua:\s*(.*?)(?=\s*\||$)/);
+  const matchNum = str.match(/Num:\s*(.*?)(?=\s*\||$)/);
+  const matchBairro = str.match(/Bairro:\s*(.*?)(?=\s*\||$)/);
+  const matchCep = str.match(/CEP:\s*(.*?)(?=\s*\||$)/);
+  
+  if (matchRua) res.rua = matchRua[1];
+  if (matchNum) res.numero = matchNum[1];
+  if (matchBairro) res.bairro = matchBairro[1];
+  if (matchCep) res.cep = matchCep[1];
+  
+  if (!matchRua && !matchNum && !matchBairro && !matchCep) {
+    res.rua = str;
+  }
+  
+  return res;
+};
+
+const parseCidadeConsolidada = (str: string) => {
+  const res = { cidade: '', uf: '' };
+  if (!str) return res;
+  const partes = str.split(' - ');
+  if (partes.length >= 2) {
+    res.uf = partes.pop() || '';
+    res.cidade = partes.join(' - ');
+  } else {
+    res.cidade = str;
+  }
+  return res;
+};
 
 export const Configuracoes: React.FC = () => {
   const { 
@@ -38,12 +73,58 @@ export const Configuracoes: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados locais
-  const [activeSubTab, setActiveSubTab] = useState<'relatorios' | 'backup' | 'logs' | 'crm_cashback' | 'licenca'>('relatorios');
+  const [activeSubTab, setActiveSubTab] = useState<'relatorios' | 'backup' | 'logs' | 'crm_cashback' | 'licenca' | 'empresa'>('relatorios');
   
+  // Form states - Loja
+  const [lojaNome, setLojaNome] = useState('');
+  const [lojaCNPJ, setLojaCNPJ] = useState('');
+  const [lojaTelefone, setLojaTelefone] = useState('');
+  const [lojaCep, setLojaCep] = useState('');
+  const [lojaRua, setLojaRua] = useState('');
+  const [lojaNumero, setLojaNumero] = useState('');
+  const [lojaBairro, setLojaBairro] = useState('');
+  const [lojaCidade, setLojaCidade] = useState('');
+  const [lojaUF, setLojaUF] = useState('');
+  const [loadingLojaCep, setLoadingLojaCep] = useState(false);
+  const [savingLojaInfo, setSavingLojaInfo] = useState(false);
+
+  useEffect(() => {
+    if (lojaInfo) {
+      setLojaNome(lojaInfo.nome || '');
+      setLojaCNPJ(lojaInfo.cnpj || '');
+      setLojaTelefone(lojaInfo.telefone || '');
+      
+      if (lojaInfo.endereco) {
+        const parsed = parseEnderecoConsolidado(lojaInfo.endereco);
+        setLojaCep(parsed.cep);
+        setLojaRua(parsed.rua);
+        setLojaNumero(parsed.numero);
+        setLojaBairro(parsed.bairro);
+      } else {
+        setLojaCep('');
+        setLojaRua('');
+        setLojaNumero('');
+        setLojaBairro('');
+      }
+
+      if (lojaInfo.cidade) {
+        const parsed = parseCidadeConsolidada(lojaInfo.cidade);
+        setLojaCidade(parsed.cidade);
+        setLojaUF(parsed.uf);
+      } else {
+        setLojaCidade('');
+        setLojaUF('');
+      }
+    }
+  }, [lojaInfo]);
+
   useEffect(() => {
     const savedSubTab = localStorage.getItem('erp_configuracoes_subtab');
     if (savedSubTab === 'licenca') {
       setActiveSubTab('licenca');
+      localStorage.removeItem('erp_configuracoes_subtab');
+    } else if (savedSubTab === 'empresa') {
+      setActiveSubTab('empresa');
       localStorage.removeItem('erp_configuracoes_subtab');
     }
   }, []);
@@ -68,6 +149,74 @@ export const Configuracoes: React.FC = () => {
       mensagemAniversario
     });
     alert('Configurações de Fidelidade & CRM salvas com sucesso!');
+  };
+
+  const handleLojaCepChange = async (val: string) => {
+    const clean = val.replace(/\D/g, '').substring(0, 8);
+    let formatted = clean;
+    if (clean.length > 5) {
+      formatted = clean.substring(0, 5) + '-' + clean.substring(5);
+    }
+    setLojaCep(formatted);
+
+    if (clean.length === 8) {
+      setLoadingLojaCep(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setLojaRua(data.logradouro || '');
+          setLojaBairro(data.bairro || '');
+          setLojaCidade(data.localidade || '');
+          setLojaUF(data.uf || '');
+          
+          setTimeout(() => {
+            const numEl = document.getElementById('loja-numero-input');
+            if (numEl) numEl.focus();
+          }, 50);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar CEP da loja:', err);
+      } finally {
+        setLoadingLojaCep(false);
+      }
+    }
+  };
+
+  const handleSaveLojaInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lojaNome.trim()) {
+      alert('O nome da empresa é obrigatório.');
+      return;
+    }
+    if (!lojaId) return;
+
+    setSavingLojaInfo(true);
+    try {
+      const enderecoConsolidado = `Rua: ${lojaRua.trim()} | Num: ${lojaNumero.trim()} | Bairro: ${lojaBairro.trim()} | CEP: ${lojaCep.trim()}`;
+      const cidadeConsolidada = `${lojaCidade.trim()} - ${lojaUF.trim().toUpperCase()}`;
+
+      const { error } = await supabase
+        .from('lojas')
+        .update({
+          nome: lojaNome.trim(),
+          cnpj: formatCNPJ(lojaCNPJ),
+          telefone: formatPhone(lojaTelefone),
+          endereco: enderecoConsolidado,
+          cidade: cidadeConsolidada
+        })
+        .eq('id', lojaId);
+
+      if (error) throw error;
+
+      alert('Dados da empresa salvos com sucesso!');
+      await reloadStoreStatus();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Erro ao salvar dados da empresa.');
+    } finally {
+      setSavingLojaInfo(false);
+    }
   };
 
   const handleAtivarToken = async (e: React.FormEvent) => {
@@ -215,6 +364,14 @@ export const Configuracoes: React.FC = () => {
         >
           <Sparkles size={18} />
           Fidelidade & CRM
+        </button>
+        <button
+          onClick={() => setActiveSubTab('empresa')}
+          className={`btn ${activeSubTab === 'empresa' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ flex: 1, minWidth: '130px' }}
+        >
+          <Building2 size={18} />
+          Dados da Empresa
         </button>
         <button
           onClick={() => setActiveSubTab('licenca')}
@@ -539,6 +696,151 @@ export const Configuracoes: React.FC = () => {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* --- SUB-ABA 6: DADOS DA EMPRESA --- */}
+      {activeSubTab === 'empresa' && (
+        <div className="card glass" style={{ padding: '20px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Building2 size={20} style={{ color: 'var(--primary-color)' }} />
+            Dados da Empresa (Loja)
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Preencha os dados comerciais da sua empresa. Essas informações são usadas para cabeçalhos de relatórios, cupons, e personalizações do sistema.
+          </p>
+
+          <form onSubmit={handleSaveLojaInfo} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Razão Social / Nome da Loja *</label>
+              <input
+                type="text"
+                required
+                placeholder="Nome da sua loja"
+                value={lojaNome}
+                onChange={(e) => setLojaNome(e.target.value)}
+                className="form-input"
+                disabled={savingLojaInfo || !hasAccess('settings_view')}
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">CNPJ (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="00.000.000/0001-00"
+                  value={lojaCNPJ}
+                  onChange={(e) => setLojaCNPJ(formatCNPJ(e.target.value))}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Telefone de Contato</label>
+                <input
+                  type="text"
+                  placeholder="(00) 00000-0000"
+                  value={lojaTelefone}
+                  onChange={(e) => setLojaTelefone(formatPhone(e.target.value))}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">CEP (Digite para preencher)</label>
+                <div className="input-icon-wrapper">
+                  <input
+                    type="text"
+                    placeholder="00000-000"
+                    value={lojaCep}
+                    onChange={(e) => handleLojaCepChange(e.target.value)}
+                    className="form-input"
+                    disabled={loadingLojaCep || savingLojaInfo || !hasAccess('settings_view')}
+                  />
+                  {loadingLojaCep && <Loader2 size={16} className="spinner input-icon" style={{ right: '12px', left: 'auto' }} />}
+                </div>
+              </div>
+              <div className="form-group" style={{ flex: 2 }}>
+                <label className="form-label">Endereço / Rua</label>
+                <input
+                  type="text"
+                  placeholder="Av. Paulista, Rua das Flores..."
+                  value={lojaRua}
+                  onChange={(e) => setLojaRua(e.target.value)}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group" style={{ flex: 0.7 }}>
+                <label className="form-label">Número</label>
+                <input
+                  id="loja-numero-input"
+                  type="text"
+                  placeholder="Ex: 123"
+                  value={lojaNumero}
+                  onChange={(e) => setLojaNumero(e.target.value)}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1.3 }}>
+                <label className="form-label">Bairro</label>
+                <input
+                  type="text"
+                  placeholder="Bairro"
+                  value={lojaBairro}
+                  onChange={(e) => setLojaBairro(e.target.value)}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group" style={{ flex: 2.5 }}>
+                <label className="form-label">Cidade</label>
+                <input
+                  type="text"
+                  placeholder="Cidade"
+                  value={lojaCidade}
+                  onChange={(e) => setLojaCidade(e.target.value)}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+              <div className="form-group" style={{ flex: 0.7 }}>
+                <label className="form-label">UF</label>
+                <input
+                  type="text"
+                  maxLength={2}
+                  placeholder="SP"
+                  value={lojaUF}
+                  onChange={(e) => setLojaUF(e.target.value.toUpperCase())}
+                  className="form-input"
+                  disabled={savingLojaInfo || !hasAccess('settings_view')}
+                />
+              </div>
+            </div>
+
+            {hasAccess('settings_view') && (
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: 'fit-content', padding: '10px 24px', fontWeight: 700, marginTop: '10px' }}
+                disabled={savingLojaInfo || loadingLojaCep}
+              >
+                {savingLojaInfo ? <Loader2 size={16} className="spinner" /> : <Check size={16} />}
+                <span>Salvar Dados da Empresa</span>
+              </button>
+            )}
+          </form>
         </div>
       )}
 

@@ -13,9 +13,35 @@ import {
   Plus,
   Mail,
   Search,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from 'lucide-react';
 import { formatCNPJ, formatPhone } from '../../utils/formatters';
+
+const parseEnderecoConsolidado = (str: string) => {
+  const res = { rua: '', numero: '', bairro: '', cidade: '', uf: '', cep: '' };
+  if (!str) return res;
+  
+  const matchRua = str.match(/Rua:\s*(.*?)(?=\s*\||$)/);
+  const matchNum = str.match(/Num:\s*(.*?)(?=\s*\||$)/);
+  const matchBairro = str.match(/Bairro:\s*(.*?)(?=\s*\||$)/);
+  const matchCidade = str.match(/Cidade:\s*(.*?)(?=\s*\||$)/);
+  const matchUF = str.match(/UF:\s*(.*?)(?=\s*\||$)/);
+  const matchCep = str.match(/CEP:\s*(.*?)(?=\s*\||$)/);
+  
+  if (matchRua) res.rua = matchRua[1];
+  if (matchNum) res.numero = matchNum[1];
+  if (matchBairro) res.bairro = matchBairro[1];
+  if (matchCidade) res.cidade = matchCidade[1];
+  if (matchUF) res.uf = matchUF[1];
+  if (matchCep) res.cep = matchCep[1];
+  
+  if (!matchRua && !matchNum && !matchBairro && !matchCep) {
+    res.rua = str;
+  }
+  
+  return res;
+};
 
 export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) => {
   const { 
@@ -40,8 +66,16 @@ export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) =
   const [fornTelefone, setFornTelefone] = useState('');
   const [fornWhatsapp, setFornWhatsapp] = useState('');
   const [fornEmail, setFornEmail] = useState('');
-  const [fornEndereco, setFornEndereco] = useState('');
   const [fornObservacoes, setFornObservacoes] = useState('');
+
+  // Estados locais para endereço individual (ViaCEP)
+  const [fornCep, setFornCep] = useState('');
+  const [fornRua, setFornRua] = useState('');
+  const [fornNumero, setFornNumero] = useState('');
+  const [fornBairro, setFornBairro] = useState('');
+  const [fornCidade, setFornCidade] = useState('');
+  const [fornUF, setFornUF] = useState('');
+  const [loadingCep, setLoadingCep] = useState(false);
 
   // Reset form
   const clearFornForm = () => {
@@ -51,8 +85,16 @@ export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) =
     setFornTelefone('');
     setFornWhatsapp('');
     setFornEmail('');
-    setFornEndereco('');
     setFornObservacoes('');
+    
+    // Limpar campos de CEP/endereço
+    setFornCep('');
+    setFornRua('');
+    setFornNumero('');
+    setFornBairro('');
+    setFornCidade('');
+    setFornUF('');
+    setLoadingCep(false);
     setIsEditing(false);
   };
 
@@ -72,10 +114,60 @@ export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) =
     setFornTelefone(f.telefone);
     setFornWhatsapp(f.whatsapp);
     setFornEmail(f.email);
-    setFornEndereco(f.endereco);
     setFornObservacoes(f.observacoes || '');
+
+    // Parse do endereço consolidado
+    if (f.endereco) {
+      const parsed = parseEnderecoConsolidado(f.endereco);
+      setFornCep(parsed.cep);
+      setFornRua(parsed.rua);
+      setFornNumero(parsed.numero);
+      setFornBairro(parsed.bairro);
+      setFornCidade(parsed.cidade);
+      setFornUF(parsed.uf);
+    } else {
+      setFornCep('');
+      setFornRua('');
+      setFornNumero('');
+      setFornBairro('');
+      setFornCidade('');
+      setFornUF('');
+    }
+
     setIsEditing(true);
     setShowModal('fornecedor');
+  };
+
+  const handleFornCepChange = async (val: string) => {
+    const clean = val.replace(/\D/g, '').substring(0, 8);
+    let formatted = clean;
+    if (clean.length > 5) {
+      formatted = clean.substring(0, 5) + '-' + clean.substring(5);
+    }
+    setFornCep(formatted);
+
+    if (clean.length === 8) {
+      setLoadingCep(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setFornRua(data.logradouro || '');
+          setFornBairro(data.bairro || '');
+          setFornCidade(data.localidade || '');
+          setFornUF(data.uf || '');
+          
+          setTimeout(() => {
+            const numEl = document.getElementById('forn-numero-input');
+            if (numEl) numEl.focus();
+          }, 50);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar CEP do fornecedor:', err);
+      } finally {
+        setLoadingCep(false);
+      }
+    }
   };
 
   const handleSaveFornecedor = (e: React.FormEvent) => {
@@ -85,6 +177,9 @@ export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) =
       return;
     }
 
+    // Consolidar endereço
+    const enderecoConsolidado = `Rua: ${fornRua.trim()} | Num: ${fornNumero.trim()} | Bairro: ${fornBairro.trim()} | Cidade: ${fornCidade.trim()} | UF: ${fornUF.trim().toUpperCase()} | CEP: ${fornCep.trim()}`;
+
     const payload = {
       razaoSocial: fornRazao,
       nomeFantasia: fornFantasia,
@@ -92,7 +187,7 @@ export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) =
       telefone: formatPhone(fornTelefone),
       whatsapp: fornWhatsapp.replace(/\D/g, ''),
       email: fornEmail,
-      endereco: fornEndereco,
+      endereco: enderecoConsolidado,
       observacoes: fornObservacoes
     };
 
@@ -339,15 +434,80 @@ export const Fornecedores: React.FC<{ filterText: string }> = ({ filterText }) =
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Endereço Comercial</label>
-                <input
-                  type="text"
-                  placeholder="Rua, número, galpão, cidade, estado"
-                  value={fornEndereco}
-                  onChange={(e) => setFornEndereco(e.target.value)}
-                  className="form-input"
-                />
+              {/* Área de Endereço Comercial com ViaCEP */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">CEP (Digite para preencher)</label>
+                  <div className="input-icon-wrapper">
+                    <input
+                      type="text"
+                      placeholder="00000-000"
+                      value={fornCep}
+                      onChange={(e) => handleFornCepChange(e.target.value)}
+                      className="form-input"
+                      disabled={loadingCep}
+                    />
+                    {loadingCep && <Loader2 size={16} className="spinner input-icon" style={{ right: '12px', left: 'auto' }} />}
+                  </div>
+                </div>
+                <div className="form-group" style={{ flex: 2 }}>
+                  <label className="form-label">Logradouro / Rua</label>
+                  <input
+                    type="text"
+                    placeholder="Av. Paulista, Rua das Flores..."
+                    value={fornRua}
+                    onChange={(e) => setFornRua(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 0.7 }}>
+                  <label className="form-label">Número / Galpão</label>
+                  <input
+                    id="forn-numero-input"
+                    type="text"
+                    placeholder="Ex: 123, Bloco A"
+                    value={fornNumero}
+                    onChange={(e) => setFornNumero(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1.3 }}>
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    placeholder="Bairro"
+                    value={fornBairro}
+                    onChange={(e) => setFornBairro(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 2.5 }}>
+                  <label className="form-label">Cidade</label>
+                  <input
+                    type="text"
+                    placeholder="Cidade"
+                    value={fornCidade}
+                    onChange={(e) => setFornCidade(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 0.7 }}>
+                  <label className="form-label">UF</label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="SP"
+                    value={fornUF}
+                    onChange={(e) => setFornUF(e.target.value.toUpperCase())}
+                    className="form-input"
+                  />
+                </div>
               </div>
 
               <div className="form-group">

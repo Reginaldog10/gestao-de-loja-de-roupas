@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -10,7 +10,8 @@ import {
   Users, 
   ArrowUpRight, 
   Sparkles,
-  Cake
+  Cake,
+  Building2
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -22,7 +23,16 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
     produtos 
   } = useApp();
 
-  const { lojaInfo } = useAuth();
+  const { lojaInfo, currentProfile } = useAuth();
+
+  const [dismissedEmpresaBanner, setDismissedEmpresaBanner] = useState(
+    sessionStorage.getItem('erp_dismiss_empresa_banner') === 'true'
+  );
+
+  const handleDismissEmpresaBanner = () => {
+    sessionStorage.setItem('erp_dismiss_empresa_banner', 'true');
+    setDismissedEmpresaBanner(true);
+  };
 
   // Calcular dias de teste restantes
   let diffDays = 0;
@@ -194,6 +204,55 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
           <button className="btn btn-secondary btn-xs" style={{ background: 'white', color: '#7c3aed', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}>
             Ativar Licença
           </button>
+        </div>
+      )}
+
+      {/* BANNER COMPLETAR CADASTRO DA EMPRESA */}
+      {currentProfile === 'administrador' && !dismissedEmpresaBanner && lojaInfo && (!lojaInfo.cnpj || !lojaInfo.endereco) && (
+        <div 
+          style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            color: 'white',
+            padding: '16px 20px',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            boxShadow: '0 8px 24px rgba(29, 78, 216, 0.25)',
+            userSelect: 'none'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Building2 size={20} color="#fff" />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <strong style={{ fontSize: '0.9rem', display: 'block' }}>Complete o Cadastro da sua Empresa</strong>
+              <span style={{ fontSize: '0.8rem', opacity: 0.95 }}>
+                Adicione CNPJ, Telefone e Endereço nas Configurações para emitir relatórios timbrados e cupons com a sua marca.
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              onClick={handleDismissEmpresaBanner}
+              className="btn btn-secondary btn-xs" 
+              style={{ background: 'transparent', color: 'white', border: '1px solid white', whiteSpace: 'nowrap', padding: '6px 12px' }}
+            >
+              Mais tarde
+            </button>
+            <button 
+              onClick={() => {
+                localStorage.setItem('erp_configuracoes_subtab', 'empresa');
+                setActiveTab('configuracoes');
+              }}
+              className="btn btn-secondary btn-xs" 
+              style={{ background: 'white', color: '#1d4ed8', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}
+            >
+              Completar Agora
+            </button>
+          </div>
         </div>
       )}
 

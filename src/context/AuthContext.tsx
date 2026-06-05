@@ -18,6 +18,10 @@ interface AuthStoreInfo {
   slug: string;
   status: 'ativo' | 'bloqueado' | 'expirado';
   expiracao: string | null;
+  cnpj?: string | null;
+  telefone?: string | null;
+  endereco?: string | null;
+  cidade?: string | null;
 }
 
 interface AuthContextType {
@@ -93,7 +97,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             nome,
             slug,
             status,
-            expiracao
+            expiracao,
+            cnpj,
+            telefone,
+            endereco,
+            cidade
           )
         `)
         .eq('id', currentUser.id)
@@ -124,13 +132,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPermissions(PERMISSION_MAP[dbPerfil]);
         
         if (data.lojas) {
-          // data.lojas pode vir como objeto simples ou array dependendo da tipagem do Supabase, geralmente é objeto devido ao link 1:1
           const loja = data.lojas as any;
           setLojaInfo({
             nome: loja.nome,
             slug: loja.slug,
             status: loja.status,
-            expiracao: loja.expiracao
+            expiracao: loja.expiracao,
+            cnpj: loja.cnpj,
+            telefone: loja.telefone,
+            endereco: loja.endereco,
+            cidade: loja.cidade
           });
         } else {
           setLojaInfo(null);

@@ -71,10 +71,15 @@ export const Layout: React.FC<LayoutProps> = ({
     <div className="app-container">
       {/* SIDEBAR - DESKTOP ONLY */}
       <aside className="desktop-sidebar glass">
-        <div className="sidebar-brand">
-          <div className="brand-dot"></div>
-          <h2>GlowPOS</h2>
-          <span className="brand-badge">ERP</span>
+        <div className="sidebar-brand-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px', paddingLeft: '8px' }}>
+          <div className="sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 0, paddingLeft: 0 }}>
+            <div className="brand-dot"></div>
+            <h2>GlowPOS</h2>
+            <span className="brand-badge">ERP</span>
+          </div>
+          <span className="sidebar-slogan" style={{ fontSize: '0.625rem', color: 'var(--text-muted)', lineHeight: '1.3', display: 'block', paddingRight: '8px', fontWeight: 500, textAlign: 'left' }}>
+            PDV, estoque e crediário em uma única plataforma.
+          </span>
         </div>
 
         {isOfflineMode && (

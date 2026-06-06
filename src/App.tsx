@@ -172,9 +172,25 @@ function AppContent() {
         }}>
           <Sparkles size={24} color="#fff" />
         </div>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.5px' }}>GlowPOS</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-          <Loader2 size={16} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          GlowPOS 
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: 'rgba(168, 85, 247, 0.2)',
+            border: '1px solid rgba(168, 85, 247, 0.4)',
+            color: '#c084fc'
+          }}>
+            ERP
+          </span>
+        </h2>
+        <p style={{ margin: '2px 0 8px 0', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', maxWidth: '300px', lineHeight: '1.3' }}>
+          PDV, estoque e crediário em uma única plataforma.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.8rem' }}>
+          <Loader2 size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
           <span>Verificando conexão com o servidor...</span>
         </div>
         <style>{`

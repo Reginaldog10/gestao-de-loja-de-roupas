@@ -29,9 +29,20 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
     sessionStorage.getItem('erp_dismiss_empresa_banner') === 'true'
   );
 
-  const handleDismissEmpresaBanner = () => {
+  const [dismissedTesteBanner, setDismissedTesteBanner] = useState(
+    sessionStorage.getItem('erp_dismiss_teste_banner') === 'true'
+  );
+
+  const handleDismissEmpresaBanner = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     sessionStorage.setItem('erp_dismiss_empresa_banner', 'true');
     setDismissedEmpresaBanner(true);
+  };
+
+  const handleDismissTesteBanner = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    sessionStorage.setItem('erp_dismiss_teste_banner', 'true');
+    setDismissedTesteBanner(true);
   };
 
   // Calcular dias de teste restantes
@@ -169,7 +180,7 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
     <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
       {/* BANNER DE TESTE */}
-      {diffDays > 0 && diffDays <= 30 && (
+      {diffDays > 0 && diffDays <= 30 && !dismissedTesteBanner && (
         <div 
           onClick={() => {
             localStorage.setItem('erp_configuracoes_subtab', 'licenca');
@@ -193,16 +204,36 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
               </span>
             </div>
           </div>
-          <div className="dashboard-banner-actions">
+          <div className="dashboard-banner-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button className="btn btn-secondary btn-xs" style={{ background: 'white', color: '#7c3aed', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}>
               Ativar Licença
+            </button>
+            <button 
+              onClick={handleDismissTesteBanner}
+              style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+              title="Fechar aviso"
+            >
+              <span style={{ fontWeight: 'bold', fontSize: '12px', lineHeight: '12px' }}>✕</span>
             </button>
           </div>
         </div>
       )}
 
       {/* BANNER COMPLETAR CADASTRO DA EMPRESA */}
-      {currentProfile === 'administrador' && !dismissedEmpresaBanner && lojaInfo && (!lojaInfo.cnpj || !lojaInfo.endereco) && (
+      {currentProfile === 'administrador' && !dismissedEmpresaBanner && lojaInfo && (!lojaInfo.cnpj || !lojaInfo.endereco || !lojaInfo.telefone) && (
         <div 
           className="dashboard-banner"
           style={{
@@ -220,9 +251,9 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
               </span>
             </div>
           </div>
-          <div className="dashboard-banner-actions">
+          <div className="dashboard-banner-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button 
-              onClick={handleDismissEmpresaBanner}
+              onClick={() => handleDismissEmpresaBanner()}
               className="btn btn-secondary btn-xs" 
               style={{ background: 'transparent', color: 'white', border: '1px solid white', whiteSpace: 'nowrap', padding: '6px 12px' }}
             >
@@ -237,6 +268,26 @@ export const Dashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
               style={{ background: 'white', color: '#1d4ed8', fontWeight: 800, border: 'none', whiteSpace: 'nowrap', padding: '6px 12px' }}
             >
               Completar Agora
+            </button>
+            <button 
+              onClick={(e) => handleDismissEmpresaBanner(e)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+              title="Fechar aviso"
+            >
+              <span style={{ fontWeight: 'bold', fontSize: '12px', lineHeight: '12px' }}>✕</span>
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Mail, Lock, User, ArrowRight, Loader2, Sparkles, Phone, Globe, Building, Check } from 'lucide-react';
 import { supabase, isOfflineMode } from '../../utils/supabaseClient';
 import { formatPhone } from '../../utils/formatters';
+import { Logo } from '../Logo';
 import './login.css';
 
 export const Login: React.FC = () => {
@@ -264,8 +265,8 @@ export const Login: React.FC = () => {
         {/* Conteúdo Central da Marca */}
         <div className="left-content-wrapper">
           <div className="brand-logo-container">
-            <div className="brand-logo-icon">
-              <Sparkles size={36} className="brand-sparkle" />
+            <div className="brand-logo-icon" style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+              <Logo size={38} style={{ filter: 'drop-shadow(0 2px 8px rgba(109, 40, 217, 0.3))' }} />
             </div>
             <h1 className="brand-name">GlowPOS <span className="brand-tag">ERP</span></h1>
           </div>
@@ -278,8 +279,8 @@ export const Login: React.FC = () => {
         {/* Marca exibida apenas na visualização mobile */}
         <div className="mobile-brand-header" style={{ flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div className="brand-logo-icon-sm">
-              <Sparkles size={20} className="brand-sparkle" />
+            <div className="brand-logo-icon-sm" style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+              <Logo size={22} />
             </div>
             <h2>GlowPOS <span className="brand-tag-sm">ERP</span></h2>
           </div>

@@ -14,7 +14,8 @@ import { SuperDashboard } from './pages/SuperAdmin/SuperDashboard';
 import { SuperLojas } from './pages/SuperAdmin/SuperLojas';
 import { SuperPlanos } from './pages/SuperAdmin/SuperPlanos';
 import { supabase } from './utils/supabaseClient';
-import { Loader2, Sparkles, ShieldAlert, Key, LogOut } from 'lucide-react';
+import { Logo } from './components/Logo';
+import { Loader2, ShieldAlert, Key, LogOut } from 'lucide-react';
 
 function LicencaExpirada() {
   const { logout, lojaInfo, reloadStoreStatus, lojaId } = useAuth();
@@ -161,16 +162,17 @@ function AppContent() {
         gap: '1rem'
       }}>
         <div style={{
-          width: '50px',
-          height: '50px',
-          background: 'linear-gradient(135deg, #a855f7 0%, #6366f1 100%)',
-          borderRadius: '12px',
+          width: '54px',
+          height: '54px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: '14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)'
+          boxShadow: '0 8px 24px rgba(109, 40, 217, 0.2)'
         }}>
-          <Sparkles size={24} color="#fff" />
+          <Logo size={34} />
         </div>
         <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           GlowPOS 

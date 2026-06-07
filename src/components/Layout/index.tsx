@@ -16,6 +16,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { isOfflineMode } from '../../utils/supabaseClient';
+import { Logo } from '../Logo';
 import './layout.css';
 
 interface LayoutProps {
@@ -73,7 +74,7 @@ export const Layout: React.FC<LayoutProps> = ({
       <aside className="desktop-sidebar glass">
         <div className="sidebar-brand-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px', paddingLeft: '8px' }}>
           <div className="sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 0, paddingLeft: 0 }}>
-            <div className="brand-dot"></div>
+            <Logo size={24} />
             <h2>GlowPOS</h2>
             <span className="brand-badge">ERP</span>
           </div>
